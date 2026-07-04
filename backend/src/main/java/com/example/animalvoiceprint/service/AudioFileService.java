@@ -160,13 +160,7 @@ public class AudioFileService {
         }
     }
     
-    public List<AudioFile> getAudioFilesByNoiseLevel(String noiseLevel) {
-        return audioFileRepository.findByNoiseLevel(noiseLevel);
-    }
     
-    public List<AudioFile> searchAudioFilesByLocation(String location) {
-        return audioFileRepository.findByLocationContaining(location);
-    }
     
     public Resource loadAudioFileAsResource(String filePath) {
         try {

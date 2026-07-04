@@ -40,29 +40,7 @@ public class LabelController {
         return ResponseEntity.ok(ApiResponse.success(label));
     }
     
-    @GetMapping("/parent/{parentId}")
-    public ResponseEntity<ApiResponse<List<TaxonomyLabel>>> getLabelsByParentId(@PathVariable("parentId") Integer parentId) {
-        List<TaxonomyLabel> labels = labelService.getLabelsByParentId(parentId);
-        return ResponseEntity.ok(ApiResponse.success(labels));
-    }
     
-    @GetMapping("/rank/{taxonRank}")
-    public ResponseEntity<ApiResponse<List<TaxonomyLabel>>> getLabelsByTaxonRank(@PathVariable("taxonRank") String taxonRank) {
-        List<TaxonomyLabel> labels = labelService.getLabelsByTaxonRank(taxonRank);
-        return ResponseEntity.ok(ApiResponse.success(labels));
-    }
-    
-    @GetMapping("/{id}/ancestors")
-    public ResponseEntity<ApiResponse<List<TaxonomyLabel>>> getAncestors(@PathVariable("id") Integer labelId) {
-        List<TaxonomyLabel> ancestors = labelService.getAncestors(labelId);
-        return ResponseEntity.ok(ApiResponse.success(ancestors));
-    }
-    
-    @GetMapping("/{id}/descendants")
-    public ResponseEntity<ApiResponse<List<TaxonomyLabel>>> getDescendants(@PathVariable("id") Integer labelId) {
-        List<TaxonomyLabel> descendants = labelService.getDescendants(labelId);
-        return ResponseEntity.ok(ApiResponse.success(descendants));
-    }
     
     @PostMapping
     @PreAuthorize("hasAnyRole('admin', 'algorithm')")

@@ -74,14 +74,6 @@ public class LabelService {
         labelRepository.deleteById(labelId);
     }
     
-    public List<TaxonomyLabel> getLabelsByParentId(Integer parentId) {
-        return labelRepository.findByParentIdOrderByLabelName(parentId);
-    }
-    
-    public List<TaxonomyLabel> getLabelsByTaxonRank(String taxonRank) {
-        return labelRepository.findByTaxonRank(taxonRank);
-    }
-    
     public List<Map<String, Object>> getLabelTree() {
         List<TaxonomyLabel> allLabels = labelRepository.findAll();
         
@@ -108,33 +100,5 @@ public class LabelService {
         }
         
         return tree;
-    }
-    
-    public List<TaxonomyLabel> getAncestors(Integer labelId) {
-        List<TaxonomyLabel> ancestors = new ArrayList<>();
-        TaxonomyLabel current = getLabelById(labelId);
-        
-        while (current != null && current.getParentId() != 0) {
-            current = labelRepository.findById(current.getParentId()).orElse(null);
-            if (current != null) {
-                ancestors.add(current);
-            }
-        }
-        
-        return ancestors;
-    }
-    
-    public List<TaxonomyLabel> getDescendants(Integer labelId) {
-        List<TaxonomyLabel> descendants = new ArrayList<>();
-        collectDescendants(labelId, descendants);
-        return descendants;
-    }
-    
-    private void collectDescendants(Integer parentId, List<TaxonomyLabel> descendants) {
-        List<TaxonomyLabel> children = labelRepository.findByParentId(parentId);
-        for (TaxonomyLabel child : children) {
-            descendants.add(child);
-            collectDescendants(child.getLabelId(), descendants);
-        }
     }
 }

@@ -1,40 +1,40 @@
-import axios from 'axios';
+import axios from 'axios'
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 30000,
-});
+  timeout: 30000
+})
 
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token')
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`
     }
-    return config;
+    return config
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(error)
   }
-);
+)
 
 request.interceptors.response.use(
   (response) => {
     if (response.data && response.data.code === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
     }
-    return response;
+    return response
   },
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
     }
-    return Promise.reject(error);
+    return Promise.reject(error)
   }
-);
+)
 
-export default request;
+export default request

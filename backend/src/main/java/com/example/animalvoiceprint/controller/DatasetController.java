@@ -42,11 +42,7 @@ public class DatasetController {
         return ResponseEntity.ok(ApiResponse.success(datasets));
     }
     
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<ApiResponse<List<Dataset>>> getDatasetsByUserId(@PathVariable("userId") Integer userId) {
-        List<Dataset> datasets = datasetService.getDatasetsByUserId(userId);
-        return ResponseEntity.ok(ApiResponse.success(datasets));
-    }
+    
     
     @PostMapping
     @PreAuthorize("hasAnyRole('admin', 'algorithm')")

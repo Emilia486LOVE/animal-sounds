@@ -4,6 +4,7 @@ import com.example.animalvoiceprint.dto.ApiResponse;
 import com.example.animalvoiceprint.repository.AudioFileRepository;
 import com.example.animalvoiceprint.repository.AnnotationRecordRepository;
 import com.example.animalvoiceprint.repository.DatasetRepository;
+import com.example.animalvoiceprint.repository.SysUserRepository;
 import com.example.animalvoiceprint.repository.TaxonomyLabelRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,13 +24,16 @@ public class StatisticsController {
     private final AudioFileRepository audioFileRepository;
     private final AnnotationRecordRepository annotationRepository;
     private final TaxonomyLabelRepository labelRepository;
+    private final SysUserRepository userRepository;
     
     public StatisticsController(DatasetRepository datasetRepository, AudioFileRepository audioFileRepository,
-                                AnnotationRecordRepository annotationRepository, TaxonomyLabelRepository labelRepository) {
+                                AnnotationRecordRepository annotationRepository, TaxonomyLabelRepository labelRepository,
+                                SysUserRepository userRepository) {
         this.datasetRepository = datasetRepository;
         this.audioFileRepository = audioFileRepository;
         this.annotationRepository = annotationRepository;
         this.labelRepository = labelRepository;
+        this.userRepository = userRepository;
     }
     
     @GetMapping("/overview")
@@ -38,7 +42,9 @@ public class StatisticsController {
         overview.put("datasetCount", datasetRepository.count());
         overview.put("audioCount", audioFileRepository.count());
         overview.put("annotationCount", annotationRepository.count());
-        overview.put("labelCount", labelRepository.count());
+        overview.put("userCount", userRepository.count());
+        overview.put("approvedCount", annotationRepository.countByStatus("approved"));
+        overview.put("pendingReviewCount", annotationRepository.countByStatus("submitted"));
         return ResponseEntity.ok(ApiResponse.success(overview));
     }
     

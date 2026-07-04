@@ -17,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -39,14 +40,32 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/captcha").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
-                .requestMatchers("/api/statistics/**").hasAnyRole("admin", "annotator", "algorithm")
-                .requestMatchers("/api/datasets/**").hasAnyRole("admin", "annotator", "algorithm")
-                .requestMatchers("/api/train/tasks").hasAnyRole("admin", "annotator", "algorithm")
-                .requestMatchers("/api/train/tasks/{id}").hasAnyRole("admin", "annotator", "algorithm")
-                .requestMatchers("/api/train/tasks/status/{status}").hasAnyRole("admin", "annotator", "algorithm")
+                .requestMatchers(HttpMethod.GET, "/api/statistics/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/datasets/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/audio/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/labels/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/train/tasks").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/train/tasks/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/evaluation/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/prediction/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/annotations/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/datasets/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.PUT, "/api/datasets/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.DELETE, "/api/datasets/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.POST, "/api/audio/**").hasAnyRole("admin", "annotator", "algorithm")
+                .requestMatchers(HttpMethod.PUT, "/api/audio/**").hasAnyRole("admin", "annotator", "algorithm")
+                .requestMatchers(HttpMethod.DELETE, "/api/audio/**").hasAnyRole("admin", "annotator", "algorithm")
+                .requestMatchers(HttpMethod.POST, "/api/labels/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.PUT, "/api/labels/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.DELETE, "/api/labels/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.POST, "/api/annotations/**").hasAnyRole("admin", "annotator")
+                .requestMatchers(HttpMethod.PUT, "/api/annotations/**").hasAnyRole("admin", "annotator")
+                .requestMatchers(HttpMethod.DELETE, "/api/annotations/**").hasAnyRole("admin", "annotator")
+                .requestMatchers(HttpMethod.POST, "/api/train/tasks").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.PUT, "/api/train/tasks/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.DELETE, "/api/train/tasks/**").hasAnyRole("admin", "algorithm")
+                .requestMatchers(HttpMethod.POST, "/api/prediction/**").authenticated()
                 .requestMatchers("/api/admin/**").hasRole("admin")
-                .requestMatchers("/api/annotator/**").hasAnyRole("admin", "annotator")
-                .requestMatchers("/api/algorithm/**").hasAnyRole("admin", "algorithm")
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

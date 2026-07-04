@@ -62,10 +62,6 @@ public class DatasetService {
         return datasetRepository.save(dataset);
     }
     
-    public List<Dataset> getDatasetsByUserId(Integer userId) {
-        return datasetRepository.findByCreateUserId(userId);
-    }
-    
     public List<Dataset> searchDatasets(String keyword) {
         return datasetRepository.findByDatasetNameContaining(keyword);
     }

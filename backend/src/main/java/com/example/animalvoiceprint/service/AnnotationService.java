@@ -32,17 +32,7 @@ public class AnnotationService {
         return annotationRepository.findByAudioId(audioId);
     }
     
-    public List<AnnotationRecord> getAnnotationsByLabelId(Integer labelId) {
-        return annotationRepository.findByLabelId(labelId);
-    }
     
-    public List<AnnotationRecord> getAnnotationsByStatus(String status) {
-        return annotationRepository.findByStatus(status);
-    }
-    
-    public List<AnnotationRecord> getAnnotationsByAnnotatorId(Integer annotatorId) {
-        return annotationRepository.findByAnnotatorId(annotatorId);
-    }
     
     public AnnotationRecord createAnnotation(AnnotationCreateRequest request, Integer userId) {
         AnnotationRecord annotation = new AnnotationRecord();

@@ -43,23 +43,7 @@ public class AnnotationController {
         return ResponseEntity.ok(ApiResponse.success(annotations));
     }
     
-    @GetMapping("/label/{labelId}")
-    public ResponseEntity<ApiResponse<List<AnnotationRecord>>> getAnnotationsByLabelId(@PathVariable("labelId") Integer labelId) {
-        List<AnnotationRecord> annotations = annotationService.getAnnotationsByLabelId(labelId);
-        return ResponseEntity.ok(ApiResponse.success(annotations));
-    }
     
-    @GetMapping("/status/{status}")
-    public ResponseEntity<ApiResponse<List<AnnotationRecord>>> getAnnotationsByStatus(@PathVariable("status") String status) {
-        List<AnnotationRecord> annotations = annotationService.getAnnotationsByStatus(status);
-        return ResponseEntity.ok(ApiResponse.success(annotations));
-    }
-    
-    @GetMapping("/annotator/{annotatorId}")
-    public ResponseEntity<ApiResponse<List<AnnotationRecord>>> getAnnotationsByAnnotatorId(@PathVariable("annotatorId") Integer annotatorId) {
-        List<AnnotationRecord> annotations = annotationService.getAnnotationsByAnnotatorId(annotatorId);
-        return ResponseEntity.ok(ApiResponse.success(annotations));
-    }
     
     @PostMapping
     @PreAuthorize("hasAnyRole('admin', 'annotator')")

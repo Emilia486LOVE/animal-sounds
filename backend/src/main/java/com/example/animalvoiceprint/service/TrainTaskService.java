@@ -10,20 +10,15 @@ import com.example.animalvoiceprint.repository.AnnotationRecordRepository;
 import com.example.animalvoiceprint.repository.TrainSampleRepository;
 import com.example.animalvoiceprint.repository.TrainTaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
 public class TrainTaskService {
-    
-    @Value("${file.model-dir}")
-    private String modelDir;
     
     private final TrainTaskRepository taskRepository;
     private final TrainSampleRepository sampleRepository;
@@ -181,18 +176,6 @@ public class TrainTaskService {
         }
         
         taskRepository.deleteById(taskId);
-    }
-    
-    public String generateModelPath(Integer taskId) {
-        try {
-            Path taskDir = Paths.get(modelDir, String.valueOf(taskId));
-            if (!Files.exists(taskDir)) {
-                Files.createDirectories(taskDir);
-            }
-            return taskDir.resolve("model.h5").toString();
-        } catch (Exception e) {
-            throw new RuntimeException("模型路径创建失败: " + e.getMessage());
-        }
     }
     
     public Map<String, Object> getTaskProgress(Integer taskId) {

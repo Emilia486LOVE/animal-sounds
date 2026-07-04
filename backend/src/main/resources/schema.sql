@@ -144,18 +144,3 @@ CREATE TABLE IF NOT EXISTS train_sample (
     INDEX idx_split (split),
     UNIQUE KEY uk_task_annotation (task_id, annotation_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS operation_log (
-    log_id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT,
-    operation_type VARCHAR(50),
-    target_type VARCHAR(50),
-    target_id INT,
-    detail TEXT,
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES sys_user(user_id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_operation_type (operation_type),
-    INDEX idx_target_type (target_type),
-    INDEX idx_create_time (create_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,40 +1,24 @@
 {
-  "name": "animal-voiceprint-frontend",
-  "version": "1.0.0",
+  "name": "vite-vue-starter",
   "private": true,
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.3",
-    "axios": "^1.6.8",
-    "antd": "^5.15.0",
-    "@ant-design/icons": "^5.3.6",
-    "echarts": "^5.5.0",
-    "echarts-for-react": "^3.0.2",
-    "wavesurfer.js": "^7.7.3",
-    "web-audio-beat-detector": "^6.0.0",
-    "dayjs": "^1.11.10"
-  },
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "dayjs": "^1.11.21",
+    "echarts": "^6.1.0",
+    "element-plus": "^2.14.2",
+    "vue": "^3.5.39",
+    "vue-router": "^4.6.4",
+    "wavesurfer.js": "^7.12.8"
   },
   "devDependencies": {
-    "react-scripts": "5.0.1"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "proxy": "http://localhost:8080"
+    "@vitejs/plugin-vue": "^6.0.7",
+    "vite": "^8.1.1"
+  }
 }

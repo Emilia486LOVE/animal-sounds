@@ -98,11 +98,4 @@ public class TrainTaskController {
         trainTaskService.deleteTask(taskId);
         return ResponseEntity.ok(ApiResponse.success("训练任务已删除", null));
     }
-    
-    @GetMapping("/tasks/{id}/model-path")
-    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
-    public ResponseEntity<ApiResponse<String>> generateModelPath(@PathVariable("id") Integer taskId) {
-        String modelPath = trainTaskService.generateModelPath(taskId);
-        return ResponseEntity.ok(ApiResponse.success(modelPath));
-    }
 }

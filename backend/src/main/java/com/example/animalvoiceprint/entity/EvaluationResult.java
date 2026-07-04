@@ -53,7 +53,6 @@ public class EvaluationResult {
     public void setAccuracy(BigDecimal accuracy) { this.accuracy = accuracy; }
     public BigDecimal getPrecisionValue() { return precisionValue; }
     public void setPrecisionValue(BigDecimal precisionValue) { this.precisionValue = precisionValue; }
-    public BigDecimal getPrecision() { return precisionValue; }
     public BigDecimal getRecall() { return recall; }
     public void setRecall(BigDecimal recall) { this.recall = recall; }
     public BigDecimal getF1Score() { return f1Score; }

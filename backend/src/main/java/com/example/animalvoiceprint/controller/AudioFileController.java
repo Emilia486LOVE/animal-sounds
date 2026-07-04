@@ -1,6 +1,7 @@
 package com.example.animalvoiceprint.controller;
 
 import com.example.animalvoiceprint.dto.ApiResponse;
+import com.example.animalvoiceprint.dto.AudioFileUpdateRequest;
 import com.example.animalvoiceprint.entity.AudioFile;
 import com.example.animalvoiceprint.service.AuthService;
 import com.example.animalvoiceprint.service.AudioFileService;
@@ -46,22 +47,12 @@ public class AudioFileController {
         return ResponseEntity.ok(ApiResponse.success(files));
     }
     
-    @GetMapping("/noise/{noiseLevel}")
-    public ResponseEntity<ApiResponse<List<AudioFile>>> getAudioFilesByNoiseLevel(@PathVariable("noiseLevel") String noiseLevel) {
-        List<AudioFile> files = audioFileService.getAudioFilesByNoiseLevel(noiseLevel);
-        return ResponseEntity.ok(ApiResponse.success(files));
-    }
     
-    @GetMapping("/location")
-    public ResponseEntity<ApiResponse<List<AudioFile>>> searchAudioFilesByLocation(@RequestParam("location") String location) {
-        List<AudioFile> files = audioFileService.searchAudioFilesByLocation(location);
-        return ResponseEntity.ok(ApiResponse.success(files));
-    }
     
-    @PostMapping("/upload/{datasetId}")
+    @PostMapping("/upload")
     @PreAuthorize("hasAnyRole('admin', 'annotator', 'algorithm')")
     public ResponseEntity<ApiResponse<List<AudioFile>>> uploadAudioFiles(
-            @PathVariable("datasetId") Integer datasetId,
+            @RequestParam("datasetId") Integer datasetId,
             @RequestParam("files") List<MultipartFile> files) {
         Integer userId = authService.getCurrentUser().getUserId();
         List<AudioFile> uploaded = audioFileService.uploadAudioFiles(datasetId, files, userId);
@@ -72,10 +63,8 @@ public class AudioFileController {
     @PreAuthorize("hasAnyRole('admin', 'annotator')")
     public ResponseEntity<ApiResponse<AudioFile>> updateAudioFile(
             @PathVariable("id") Integer audioId,
-            @RequestParam(value = "noiseLevel", required = false) String noiseLevel,
-            @RequestParam(value = "location", required = false) String location,
-            @RequestParam(value = "remark", required = false) String remark) {
-        AudioFile file = audioFileService.updateAudioFile(audioId, noiseLevel, location, remark);
+            @RequestBody AudioFileUpdateRequest request) {
+        AudioFile file = audioFileService.updateAudioFile(audioId, request.getNoiseLevel(), request.getLocation(), request.getRemark());
         return ResponseEntity.ok(ApiResponse.success("音频信息已更新", file));
     }
     
