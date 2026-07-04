@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS animal_voiceprint;
+DROP USER IF EXISTS 'animal_app'@'localhost';
+DROP USER IF EXISTS 'animal_app'@'%';
+CREATE USER 'animal_app'@'localhost' IDENTIFIED WITH mysql_native_password BY 'animal_password';
+CREATE USER 'animal_app'@'%' IDENTIFIED WITH mysql_native_password BY 'animal_password';
+GRANT ALL PRIVILEGES ON animal_voiceprint.* TO 'animal_app'@'localhost';
+GRANT ALL PRIVILEGES ON animal_voiceprint.* TO 'animal_app'@'%';
+FLUSH PRIVILEGES;
+SELECT User, Host, plugin FROM mysql.user WHERE User = 'animal_app';
+USE animal_voiceprint;
+SHOW TABLES;
