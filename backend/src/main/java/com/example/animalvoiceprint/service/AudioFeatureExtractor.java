@@ -20,6 +20,10 @@ public class AudioFeatureExtractor {
     private static final int MFCC_COEFFICIENTS = 13;
     private static final int MEL_FILTERS = 26;
 
+    double[] featureMean = null;
+    double[] featureStd = null;
+    boolean featuresNormalized = false;
+
     public double[] extractMFCC(String audioFilePath) {
         File audioFile = new File(audioFilePath);
         if (!audioFile.exists()) {
@@ -86,24 +90,28 @@ public class AudioFeatureExtractor {
     private double bytesToDouble(byte[] buffer, int offset, int bytesPerSample, boolean bigEndian) {
         double value = 0;
         if (bytesPerSample == 2) {
+            int intValue;
             if (bigEndian) {
-                value = (buffer[offset] << 8) | (buffer[offset + 1] & 0xFF);
+                intValue = ((buffer[offset] & 0xFF) << 8) | (buffer[offset + 1] & 0xFF);
             } else {
-                value = (buffer[offset + 1] << 8) | (buffer[offset] & 0xFF);
+                intValue = ((buffer[offset + 1] & 0xFF) << 8) | (buffer[offset] & 0xFF);
             }
-            value /= 32768.0;
+            if ((intValue & 0x8000) != 0) {
+                intValue = intValue - 0x10000;
+            }
+            value = intValue / 32768.0;
         } else if (bytesPerSample == 4) {
-            long longValue = 0;
+            int intValue;
             if (bigEndian) {
-                longValue = ((long) buffer[offset] << 24) | ((long) (buffer[offset + 1] & 0xFF) << 16)
-                        | ((long) (buffer[offset + 2] & 0xFF) << 8) | ((long) buffer[offset + 3] & 0xFF);
+                intValue = ((buffer[offset] & 0xFF) << 24) | ((buffer[offset + 1] & 0xFF) << 16)
+                        | ((buffer[offset + 2] & 0xFF) << 8) | (buffer[offset + 3] & 0xFF);
             } else {
-                longValue = ((long) buffer[offset + 3] << 24) | ((long) (buffer[offset + 2] & 0xFF) << 16)
-                        | ((long) (buffer[offset + 1] & 0xFF) << 8) | ((long) buffer[offset] & 0xFF);
+                intValue = ((buffer[offset + 3] & 0xFF) << 24) | ((buffer[offset + 2] & 0xFF) << 16)
+                        | ((buffer[offset + 1] & 0xFF) << 8) | (buffer[offset] & 0xFF);
             }
-            value = Double.longBitsToDouble(longValue);
+            value = Float.intBitsToFloat(intValue);
         } else {
-            value = buffer[offset] / 128.0;
+            value = (buffer[offset] & 0xFF) / 128.0 - 1.0;
         }
         return value;
     }
@@ -133,19 +141,28 @@ public class AudioFeatureExtractor {
         if (n < BUFFER_SIZE) {
             double[] padded = new double[BUFFER_SIZE];
             System.arraycopy(samples, 0, padded, 0, n);
+            for (int i = n; i < BUFFER_SIZE; i++) {
+                padded[i] = 0;
+            }
             samples = padded;
             n = BUFFER_SIZE;
         }
 
         double[] window = hammingWindow(n);
+        double[] windowedSamples = new double[n];
         for (int i = 0; i < n; i++) {
-            samples[i] *= window[i];
+            windowedSamples[i] = samples[i] * window[i];
         }
 
         double[] real = new double[n];
         double[] imag = new double[n];
-        System.arraycopy(samples, 0, real, 0, n);
+        System.arraycopy(windowedSamples, 0, real, 0, n);
         fft(real, imag);
+
+        for (int i = 0; i < n; i++) {
+            real[i] /= n;
+            imag[i] /= n;
+        }
 
         double[] powerSpectrum = new double[n / 2];
         for (int i = 0; i < n / 2; i++) {
@@ -175,7 +192,7 @@ public class AudioFeatureExtractor {
         return mfcc;
     }
 
-    private void fft(double[] real, double[] imag) {
+    public void fft(double[] real, double[] imag) {
         int n = real.length;
         int shift = 0;
         for (int k = n; k > 1; k >>= 1) shift++;
@@ -249,11 +266,15 @@ public class AudioFeatureExtractor {
         }
 
         for (int m = 0; m < MEL_FILTERS; m++) {
-            for (int k = binIndices[m]; k < binIndices[m + 1]; k++) {
-                filters[m][k] = (k - binIndices[m]) / (double) (binIndices[m + 1] - binIndices[m]);
+            if (binIndices[m + 1] > binIndices[m]) {
+                for (int k = binIndices[m]; k < binIndices[m + 1]; k++) {
+                    filters[m][k] = (k - binIndices[m]) / (double) (binIndices[m + 1] - binIndices[m]);
+                }
             }
-            for (int k = binIndices[m + 1]; k < binIndices[m + 2]; k++) {
-                filters[m][k] = (binIndices[m + 2] - k) / (double) (binIndices[m + 2] - binIndices[m + 1]);
+            if (binIndices[m + 2] > binIndices[m + 1]) {
+                for (int k = binIndices[m + 1]; k < binIndices[m + 2]; k++) {
+                    filters[m][k] = (binIndices[m + 2] - k) / (double) (binIndices[m + 2] - binIndices[m + 1]);
+                }
             }
         }
 
@@ -300,12 +321,64 @@ public class AudioFeatureExtractor {
         return mean;
     }
 
+    public void fitNormalization(List<double[]> featuresList) {
+        if (featuresList == null || featuresList.isEmpty()) {
+            featuresNormalized = false;
+            return;
+        }
+
+        int dim = featuresList.get(0).length;
+        featureMean = new double[dim];
+        featureStd = new double[dim];
+
+        for (double[] features : featuresList) {
+            for (int i = 0; i < dim; i++) {
+                featureMean[i] += features[i];
+            }
+        }
+
+        for (int i = 0; i < dim; i++) {
+            featureMean[i] /= featuresList.size();
+        }
+
+        for (double[] features : featuresList) {
+            for (int i = 0; i < dim; i++) {
+                double diff = features[i] - featureMean[i];
+                featureStd[i] += diff * diff;
+            }
+        }
+
+        for (int i = 0; i < dim; i++) {
+            featureStd[i] = Math.sqrt(featureStd[i] / featuresList.size());
+            if (featureStd[i] < 1e-10) {
+                featureStd[i] = 1;
+            }
+        }
+
+        featuresNormalized = true;
+    }
+
+    public double[] normalize(double[] features) {
+        if (!featuresNormalized || featureMean == null || featureStd == null) {
+            return features;
+        }
+
+        double[] normalized = new double[features.length];
+        for (int i = 0; i < features.length; i++) {
+            normalized[i] = (features[i] - featureMean[i]) / featureStd[i];
+        }
+        return normalized;
+    }
+
     public double[] extractCombinedFeatures(String audioFilePath) {
         double[] mfcc = extractMFCC(audioFilePath);
         if (mfcc == null) {
             return null;
         }
 
+        if (featuresNormalized) {
+            return normalize(mfcc);
+        }
         return mfcc;
     }
 
@@ -316,7 +389,8 @@ public class AudioFeatureExtractor {
 
         double sum = 0;
         for (int i = 0; i < features1.length; i++) {
-            sum += Math.pow(features1[i] - features2[i], 2);
+            double diff = features1[i] - features2[i];
+            sum += diff * diff;
         }
         return Math.sqrt(sum);
     }
@@ -332,8 +406,8 @@ public class AudioFeatureExtractor {
 
         for (int i = 0; i < features1.length; i++) {
             dotProduct += features1[i] * features2[i];
-            norm1 += Math.pow(features1[i], 2);
-            norm2 += Math.pow(features2[i], 2);
+            norm1 += features1[i] * features1[i];
+            norm2 += features2[i] * features2[i];
         }
 
         if (norm1 == 0 || norm2 == 0) {
@@ -341,5 +415,9 @@ public class AudioFeatureExtractor {
         }
 
         return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+    }
+
+    public boolean isFeaturesNormalized() {
+        return featuresNormalized;
     }
 }

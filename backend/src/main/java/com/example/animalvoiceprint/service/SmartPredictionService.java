@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,10 +80,18 @@ public class SmartPredictionService {
         }
 
         String filePath = audioFile.getFilePath();
-        if (filePath.startsWith("uploads/")) {
-            filePath = filePath.substring("uploads/".length());
+        String fullPath = filePath;
+        
+        File testFile = new File(fullPath);
+        if (!testFile.exists()) {
+            String relativePath = filePath;
+            if (relativePath.startsWith("uploads/")) {
+                relativePath = relativePath.substring("uploads/".length());
+            } else if (relativePath.startsWith("/")) {
+                relativePath = relativePath.substring(1);
+            }
+            fullPath = uploadDir + "/" + relativePath;
         }
-        String fullPath = uploadDir + "/" + filePath;
         double[] features = featureExtractor.extractMFCC(fullPath);
 
         List<Map<String, Object>> predictions;
@@ -276,7 +285,19 @@ public class SmartPredictionService {
     private String getPredictedLabelName(Integer audioId) {
         AudioFile audio = audioFileRepository.findById(audioId).orElse(null);
         if (audio != null && audio.getFilePath() != null) {
-            String fullPath = uploadDir + "/" + audio.getFilePath();
+            String filePath = audio.getFilePath();
+            String fullPath = filePath;
+            
+            File testFile = new File(fullPath);
+            if (!testFile.exists()) {
+                String relativePath = filePath;
+                if (relativePath.startsWith("uploads/")) {
+                    relativePath = relativePath.substring("uploads/".length());
+                } else if (relativePath.startsWith("/")) {
+                    relativePath = relativePath.substring(1);
+                }
+                fullPath = uploadDir + "/" + relativePath;
+            }
             double[] features = featureExtractor.extractMFCC(fullPath);
             if (features != null) {
                 Map<String, Object> prediction = classificationModel.predict(features, 1);

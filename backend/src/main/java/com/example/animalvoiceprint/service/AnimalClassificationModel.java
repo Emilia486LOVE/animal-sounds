@@ -12,15 +12,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.io.*;
 import java.util.*;
 
 @Service
 public class AnimalClassificationModel {
 
     private static final Logger logger = LoggerFactory.getLogger(AnimalClassificationModel.class);
+    private static final String MODEL_FILE_NAME = "animal_classification_model.dat";
 
     @Value("${file.upload-dir}")
     private String uploadDir;
+
+    @Value("${file.model-dir}")
+    private String modelDir;
 
     private final AudioFileRepository audioFileRepository;
     private final TaxonomyLabelRepository labelRepository;
@@ -30,8 +35,11 @@ public class AnimalClassificationModel {
     private List<TrainingSample> trainingSamples = new ArrayList<>();
     private boolean isTrained = false;
     private int k = 5;
+    private double maxDistance = 100.0;
 
-    public record TrainingSample(double[] features, String labelName, Integer labelId) {}
+    public record TrainingSample(double[] features, String labelName, Integer labelId) implements Serializable {
+        private static final long serialVersionUID = 1L;
+    }
 
     public AnimalClassificationModel(AudioFileRepository audioFileRepository,
                                      TaxonomyLabelRepository labelRepository,
@@ -46,9 +54,14 @@ public class AnimalClassificationModel {
     @PostConstruct
     public void init() {
         try {
-            trainModel();
+            if (loadModel()) {
+                logger.info("成功从文件加载预训练模型");
+            } else {
+                logger.info("未找到预训练模型，开始训练新模型...");
+                trainModel();
+            }
         } catch (Exception e) {
-            logger.warn("初始化训练失败，将在首次预测时进行训练: {}", e.getMessage());
+            logger.warn("初始化失败，将在首次预测时进行训练: {}", e.getMessage());
         }
     }
 
@@ -73,6 +86,9 @@ public class AnimalClassificationModel {
 
         List<AudioFile> audioFiles = audioFileRepository.findAll();
         
+        List<double[]> allFeatures = new ArrayList<>();
+        List<TrainingSample> tempSamples = new ArrayList<>();
+        
         int successCount = 0;
         int failCount = 0;
 
@@ -88,23 +104,89 @@ public class AnimalClassificationModel {
             }
 
             String filePath = audioFile.getFilePath();
-            if (filePath.startsWith("uploads/")) {
-                filePath = filePath.substring("uploads/".length());
+            String fullPath = filePath;
+            
+            File testFile = new File(fullPath);
+            if (!testFile.exists()) {
+                String relativePath = filePath;
+                if (relativePath.startsWith("uploads/")) {
+                    relativePath = relativePath.substring("uploads/".length());
+                } else if (relativePath.startsWith("/")) {
+                    relativePath = relativePath.substring(1);
+                }
+                fullPath = uploadDir + "/" + relativePath;
+                testFile = new File(fullPath);
+                if (!testFile.exists()) {
+                    logger.warn("音频文件不存在: {}", fullPath);
+                    failCount++;
+                    continue;
+                }
             }
-            String fullPath = uploadDir + "/" + filePath;
+            
             double[] features = featureExtractor.extractMFCC(fullPath);
 
             if (features != null && features.length > 0) {
-                trainingSamples.add(new TrainingSample(features, labelName, labelId));
+                tempSamples.add(new TrainingSample(features, labelName, labelId));
+                allFeatures.add(features);
                 successCount++;
             } else {
                 failCount++;
             }
         }
 
+        if (!allFeatures.isEmpty()) {
+            featureExtractor.fitNormalization(allFeatures);
+            List<TrainingSample> normalizedSamples = new ArrayList<>();
+            for (TrainingSample sample : tempSamples) {
+                double[] normalizedFeatures = featureExtractor.normalize(sample.features());
+                normalizedSamples.add(new TrainingSample(normalizedFeatures, sample.labelName(), sample.labelId()));
+            }
+            trainingSamples = normalizedSamples;
+            
+            computeMaxDistance();
+        } else {
+            trainingSamples = tempSamples;
+        }
+
         isTrained = !trainingSamples.isEmpty();
-        logger.info("模型训练完成 - 成功提取特征: {}, 失败: {}, 总样本数: {}", 
-                successCount, failCount, trainingSamples.size());
+        logger.info("模型训练完成 - 成功提取特征: {}, 失败: {}, 总样本数: {}, 特征已归一化: {}", 
+                successCount, failCount, trainingSamples.size(), featureExtractor.isFeaturesNormalized());
+
+        if (isTrained) {
+            saveModel();
+        }
+    }
+
+    private void computeMaxDistance() {
+        if (trainingSamples.size() < 2) {
+            maxDistance = 100.0;
+            return;
+        }
+
+        double maxDist = 0;
+        int sampleCount = trainingSamples.size();
+        int pairs = Math.min(1000, sampleCount * sampleCount);
+        
+        Random random = new Random(42);
+        for (int i = 0; i < pairs; i++) {
+            int idx1 = random.nextInt(sampleCount);
+            int idx2 = random.nextInt(sampleCount);
+            if (idx1 != idx2) {
+                double dist = featureExtractor.computeEuclideanDistance(
+                        trainingSamples.get(idx1).features(),
+                        trainingSamples.get(idx2).features()
+                );
+                if (dist > maxDist) {
+                    maxDist = dist;
+                }
+            }
+        }
+        
+        maxDistance = maxDist * 2;
+        if (maxDistance < 1.0) {
+            maxDistance = 100.0;
+        }
+        logger.info("计算最大距离: {}", maxDistance);
     }
 
     public Map<String, Object> predict(double[] features, int topK) {
@@ -121,6 +203,10 @@ public class AnimalClassificationModel {
             return null;
         }
 
+        if (featureExtractor.isFeaturesNormalized()) {
+            features = featureExtractor.normalize(features);
+        }
+
         List<Neighbor> neighbors = new ArrayList<>();
         for (TrainingSample sample : trainingSamples) {
             double distance = featureExtractor.computeEuclideanDistance(features, sample.features());
@@ -132,12 +218,18 @@ public class AnimalClassificationModel {
         int effectiveK = Math.min(k, neighbors.size());
         Map<String, Integer> labelCounts = new HashMap<>();
         Map<String, Double> labelDistances = new HashMap<>();
+        Map<String, Double> labelMinDistances = new HashMap<>();
 
         for (int i = 0; i < effectiveK; i++) {
             Neighbor neighbor = neighbors.get(i);
             String label = neighbor.labelName();
             labelCounts.merge(label, 1, Integer::sum);
             labelDistances.merge(label, neighbor.distance(), Double::sum);
+            
+            double currentMin = labelMinDistances.getOrDefault(label, Double.MAX_VALUE);
+            if (neighbor.distance() < currentMin) {
+                labelMinDistances.put(label, neighbor.distance());
+            }
         }
 
         List<Map<String, Object>> predictions = new ArrayList<>();
@@ -145,8 +237,9 @@ public class AnimalClassificationModel {
             String labelName = entry.getKey();
             int count = entry.getValue();
             double avgDistance = labelDistances.get(labelName) / count;
+            double minDistance = labelMinDistances.getOrDefault(labelName, avgDistance);
             
-            double confidence = calculateConfidence(count, avgDistance, effectiveK);
+            double confidence = calculateConfidence(count, avgDistance, minDistance, effectiveK);
             
             Integer labelId = null;
             for (TrainingSample sample : trainingSamples) {
@@ -178,10 +271,15 @@ public class AnimalClassificationModel {
         return result;
     }
 
-    private double calculateConfidence(int count, double avgDistance, int k) {
+    private double calculateConfidence(int count, double avgDistance, double minDistance, int k) {
         double voteScore = (double) count / k;
-        double distanceScore = Math.max(0, 1 - avgDistance / 1000);
-        return 0.7 * voteScore + 0.3 * distanceScore;
+        
+        double distanceScore = Math.max(0, 1 - avgDistance / maxDistance);
+        double minDistanceScore = Math.max(0, 1 - minDistance / (maxDistance / 2));
+        
+        double confidence = 0.5 * voteScore + 0.3 * distanceScore + 0.2 * minDistanceScore;
+        
+        return Math.max(0.01, Math.min(1.0, confidence));
     }
 
     public Map<String, Object> evaluate() {
@@ -231,6 +329,67 @@ public class AnimalClassificationModel {
         return result;
     }
 
+    public boolean saveModel() {
+        File modelFile = getModelFile();
+        try {
+            ModelData modelData = new ModelData();
+            modelData.trainingSamples = trainingSamples;
+            modelData.k = k;
+            modelData.maxDistance = maxDistance;
+            modelData.featureMean = featureExtractor.featureMean;
+            modelData.featureStd = featureExtractor.featureStd;
+            modelData.featuresNormalized = featureExtractor.featuresNormalized;
+            modelData.saveTime = System.currentTimeMillis();
+
+            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(modelFile))) {
+                oos.writeObject(modelData);
+            }
+
+            logger.info("模型已保存到文件: {}, 样本数: {}", modelFile.getAbsolutePath(), trainingSamples.size());
+            return true;
+        } catch (IOException e) {
+            logger.error("保存模型失败: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    public boolean loadModel() {
+        File modelFile = getModelFile();
+        if (!modelFile.exists()) {
+            logger.info("模型文件不存在: {}", modelFile.getAbsolutePath());
+            return false;
+        }
+
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(modelFile))) {
+            ModelData modelData = (ModelData) ois.readObject();
+
+            trainingSamples = modelData.trainingSamples;
+            k = modelData.k;
+            maxDistance = modelData.maxDistance;
+            
+            featureExtractor.featureMean = modelData.featureMean;
+            featureExtractor.featureStd = modelData.featureStd;
+            featureExtractor.featuresNormalized = modelData.featuresNormalized;
+            
+            isTrained = !trainingSamples.isEmpty();
+            
+            logger.info("模型加载成功 - 样本数: {}, k值: {}, 保存时间: {}", 
+                    trainingSamples.size(), k, new Date(modelData.saveTime));
+            return true;
+        } catch (IOException | ClassNotFoundException e) {
+            logger.error("加载模型失败: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private File getModelFile() {
+        File dir = new File(modelDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        return new File(dir, MODEL_FILE_NAME);
+    }
+
     public boolean isTrained() {
         return isTrained;
     }
@@ -243,5 +402,21 @@ public class AnimalClassificationModel {
         this.k = Math.max(1, Math.min(20, k));
     }
 
+    public double getMaxDistance() {
+        return maxDistance;
+    }
+
     private record Neighbor(double distance, String labelName, Integer labelId) {}
+
+    private static class ModelData implements Serializable {
+        private static final long serialVersionUID = 1L;
+        
+        List<TrainingSample> trainingSamples;
+        int k;
+        double maxDistance;
+        double[] featureMean;
+        double[] featureStd;
+        boolean featuresNormalized;
+        long saveTime;
+    }
 }
