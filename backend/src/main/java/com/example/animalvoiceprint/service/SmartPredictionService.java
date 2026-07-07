@@ -60,16 +60,27 @@ public class SmartPredictionService {
     }
 
     public Map<String, Object> predict(Integer audioId, Integer taskId) {
+        if (audioId == null || audioId <= 0) {
+            throw new IllegalArgumentException("音频ID不能为空或无效");
+        }
+
         AudioFile audioFile = audioFileRepository.findById(audioId)
                 .orElseThrow(() -> new RuntimeException("音频文件不存在: " + audioId));
 
+        if (audioFile.getFilePath() == null || audioFile.getFilePath().isEmpty()) {
+            throw new RuntimeException("音频文件路径无效");
+        }
+
         TrainTask task = null;
-        if (taskId != null) {
+        if (taskId != null && taskId > 0) {
             task = trainTaskRepository.findById(taskId).orElse(null);
         }
         
         if (task == null) {
-            task = trainTaskRepository.findById(1).orElse(null);
+            List<TrainTask> successTasks = trainTaskRepository.findByStatus("success");
+            if (!successTasks.isEmpty()) {
+                task = successTasks.get(0);
+            }
         }
         
         if (task == null) {
@@ -91,15 +102,37 @@ public class SmartPredictionService {
                 relativePath = relativePath.substring(1);
             }
             fullPath = uploadDir + "/" + relativePath;
+            testFile = new File(fullPath);
+            if (!testFile.exists()) {
+                logger.warn("音频文件不存在: {}", fullPath);
+                return generateErrorResult(audioFile, task, "音频文件不存在");
+            }
         }
-        double[] features = featureExtractor.extractMFCC(fullPath);
+
+        if (testFile.length() <= 0) {
+            return generateErrorResult(audioFile, task, "音频文件为空");
+        }
+
+        double[] features = null;
+        try {
+            features = featureExtractor.extractMFCC(fullPath);
+        } catch (Exception e) {
+            logger.error("特征提取失败: {}", e.getMessage(), e);
+            return generateErrorResult(audioFile, task, "特征提取失败: " + e.getMessage());
+        }
 
         List<Map<String, Object>> predictions;
         if (features != null && features.length > 0) {
-            Map<String, Object> modelResult = classificationModel.predict(features, 5);
-            if (modelResult != null && modelResult.containsKey("predictions")) {
-                predictions = (List<Map<String, Object>>) modelResult.get("predictions");
-            } else {
+            try {
+                Map<String, Object> modelResult = classificationModel.predict(features, 5);
+                if (modelResult != null && modelResult.containsKey("predictions")) {
+                    predictions = (List<Map<String, Object>>) modelResult.get("predictions");
+                } else {
+                    logger.warn("模型预测结果为空，使用备用方案");
+                    predictions = generateFallbackPredictions(audioFile);
+                }
+            } catch (Exception e) {
+                logger.error("模型预测失败: {}", e.getMessage(), e);
                 predictions = generateFallbackPredictions(audioFile);
             }
         } else {
@@ -135,6 +168,21 @@ public class SmartPredictionService {
             result.put("topPrediction", predictions.get(0));
         }
 
+        result.put("status", "success");
+        return result;
+    }
+
+    private Map<String, Object> generateErrorResult(AudioFile audioFile, TrainTask task, String errorMsg) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("audioId", audioFile.getAudioId());
+        result.put("fileName", audioFile.getFileName());
+        result.put("taskId", task.getTaskId());
+        result.put("taskName", task.getTaskName());
+        result.put("modelType", task.getModelType());
+        result.put("predictions", new ArrayList<>());
+        result.put("sampleCount", classificationModel.getTrainingSampleCount());
+        result.put("status", "error");
+        result.put("errorMessage", errorMsg);
         return result;
     }
 

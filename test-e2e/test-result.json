@@ -1,0 +1,68 @@
+{
+  "steps": [
+    {
+      "step": "Step1-登录",
+      "status": "pass",
+      "detail": "使用 admin/password 登录成功，跳转到 /dashboard"
+    },
+    {
+      "step": "Step2-进入数据集管理",
+      "status": "pass",
+      "detail": "点击\"数据集管理\"菜单，跳转到 /dataset，表格已渲染"
+    },
+    {
+      "step": "Step3-数据集列表与按钮",
+      "status": "pass",
+      "detail": "共 5 个数据集，首行\"犬科动物声纹数据集\"。按钮: 管理音频=1, 编辑=1, 刷新数量=1, 删除=1"
+    },
+    {
+      "step": "Step4-管理音频",
+      "status": "pass",
+      "detail": "点击首行\"管理音频\"按钮，音频管理对话框已弹出"
+    },
+    {
+      "step": "Step5a-标题包含数据集名称",
+      "status": "pass",
+      "detail": "对话框标题: \"音频管理 - 犬科动物声纹数据集\"，期望包含: 犬科动物声纹数据集"
+    },
+    {
+      "step": "Step5b-音频文件列表与列",
+      "status": "pass",
+      "detail": "音频行数: 29；列: 文件名=true, 时长=true, 采样率=true, 噪声等级=true"
+    },
+    {
+      "step": "Step5c-上传音频按钮",
+      "status": "pass",
+      "detail": "存在\"上传音频\"按钮"
+    },
+    {
+      "step": "Step5d-批量操作按钮",
+      "status": "pass",
+      "detail": "批量转移=true, 批量删除=true"
+    },
+    {
+      "step": "Step5e-每行转移/删除按钮",
+      "status": "pass",
+      "detail": "首行: 转移=true, 删除=true"
+    },
+    {
+      "step": "Step6-选择音频与批量计数",
+      "status": "pass",
+      "detail": "选中 3 个，批量转移显示(3)，批量删除显示(3)"
+    },
+    {
+      "step": "Step7-刷新数量",
+      "status": "pass",
+      "detail": "刷新成功，提示\"音频数量已刷新\"，刷新前数量=29，刷新后数量=29"
+    }
+  ],
+  "overall": {
+    "step1_login": true,
+    "step2_menu": true,
+    "step3_list_buttons": true,
+    "step4_open_audio": true,
+    "step5_dialog_content": true,
+    "step6_select_batch": true,
+    "step7_refresh_count": true
+  }
+}

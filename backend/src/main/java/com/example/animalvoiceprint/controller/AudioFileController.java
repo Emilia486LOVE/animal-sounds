@@ -74,6 +74,32 @@ public class AudioFileController {
         audioFileService.deleteAudioFile(audioId);
         return ResponseEntity.ok(ApiResponse.success("音频文件已删除", null));
     }
+
+    @PutMapping("/{id}/move")
+    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
+    public ResponseEntity<ApiResponse<AudioFile>> moveAudioToDataset(
+            @PathVariable("id") Integer audioId,
+            @RequestParam("targetDatasetId") Integer targetDatasetId) {
+        AudioFile audioFile = audioFileService.moveAudioToDataset(audioId, targetDatasetId);
+        return ResponseEntity.ok(ApiResponse.success("音频已转移到新数据集", audioFile));
+    }
+
+    @PutMapping("/batch-move")
+    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
+    public ResponseEntity<ApiResponse<Void>> batchMoveToDataset(
+            @RequestParam("audioIds") List<Integer> audioIds,
+            @RequestParam("targetDatasetId") Integer targetDatasetId) {
+        audioFileService.batchMoveToDataset(audioIds, targetDatasetId);
+        return ResponseEntity.ok(ApiResponse.success("批量转移完成", null));
+    }
+
+    @DeleteMapping("/batch")
+    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
+    public ResponseEntity<ApiResponse<Void>> batchDeleteAudioFiles(
+            @RequestParam("audioIds") List<Integer> audioIds) {
+        audioFileService.batchDelete(audioIds);
+        return ResponseEntity.ok(ApiResponse.success("批量删除完成", null));
+    }
     
     @GetMapping("/download/{datasetId}/{fileName}")
     public ResponseEntity<Resource> downloadAudioFile(
@@ -84,18 +110,38 @@ public class AudioFileController {
             return ResponseEntity.notFound().build();
         }
         
-        String contentType = "audio/wav";
-        if (fileName.toLowerCase().endsWith(".mp3")) {
-            contentType = "audio/mpeg";
-        } else if (fileName.toLowerCase().endsWith(".flac")) {
-            contentType = "audio/flac";
-        } else if (fileName.toLowerCase().endsWith(".ogg")) {
-            contentType = "audio/ogg";
-        }
+        String contentType = getContentType(fileName);
         
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                 .body(resource);
+    }
+    
+    @GetMapping("/download/by-id/{audioId}")
+    public ResponseEntity<Resource> downloadAudioFileById(@PathVariable("audioId") Integer audioId) {
+        AudioFile audioFile = audioFileService.getAudioFileById(audioId);
+        Resource resource = audioFileService.loadAudioFileAsResource(audioFile.getFilePath());
+        if (resource == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        String contentType = getContentType(audioFile.getFileName());
+        
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + audioFile.getFileName() + "\"")
+                .body(resource);
+    }
+    
+    private String getContentType(String fileName) {
+        if (fileName.toLowerCase().endsWith(".mp3")) {
+            return "audio/mpeg";
+        } else if (fileName.toLowerCase().endsWith(".flac")) {
+            return "audio/flac";
+        } else if (fileName.toLowerCase().endsWith(".ogg")) {
+            return "audio/ogg";
+        }
+        return "audio/wav";
     }
 }

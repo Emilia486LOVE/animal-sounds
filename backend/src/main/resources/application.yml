@@ -11,7 +11,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -41,5 +41,5 @@ file:
 
 logging:
   level:
-    com.example.animalvoiceprint: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.example.animalvoiceprint: INFO
+    org.hibernate.SQL: WARN

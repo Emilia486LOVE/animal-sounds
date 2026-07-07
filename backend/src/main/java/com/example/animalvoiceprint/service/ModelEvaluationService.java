@@ -41,21 +41,28 @@ public class ModelEvaluationService {
         
         int sampleCount = (int) realEvaluation.getOrDefault("totalSamples", 0);
         evaluation.setSampleCount(sampleCount);
-        evaluation.setClassCount((int) realEvaluation.getOrDefault("classCount", 0));
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labelDist = (Map<String, Object>) realEvaluation.getOrDefault("labelDistribution", new HashMap<>());
+        evaluation.setClassCount(labelDist.size());
         
         double accuracy = (double) realEvaluation.getOrDefault("accuracy", 0.0);
-        double precision = (double) realEvaluation.getOrDefault("precision", 0.0);
-        double recall = (double) realEvaluation.getOrDefault("recall", 0.0);
-        double f1Score = (double) realEvaluation.getOrDefault("f1Score", 0.0);
+        double macroPrecision = (double) realEvaluation.getOrDefault("macroPrecision", 0.0);
+        double macroRecall = (double) realEvaluation.getOrDefault("macroRecall", 0.0);
+        double macroF1 = (double) realEvaluation.getOrDefault("macroF1", 0.0);
         
         evaluation.setAccuracy(BigDecimal.valueOf(accuracy));
-        evaluation.setPrecision(BigDecimal.valueOf(precision));
-        evaluation.setRecall(BigDecimal.valueOf(recall));
-        evaluation.setF1Score(BigDecimal.valueOf(f1Score));
-        evaluation.setMacroF1(BigDecimal.valueOf(f1Score));
+        evaluation.setPrecision(BigDecimal.valueOf(macroPrecision));
+        evaluation.setRecall(BigDecimal.valueOf(macroRecall));
+        evaluation.setF1Score(BigDecimal.valueOf(macroF1));
+        evaluation.setMacroF1(BigDecimal.valueOf(macroF1));
         evaluation.setMicroF1(BigDecimal.valueOf(accuracy));
         
-        evaluation.setConfusionMatrix(realEvaluation.get("confusionMatrix").toString());
+        try {
+            evaluation.setConfusionMatrix(objectMapper.writeValueAsString(realEvaluation.get("confusionMatrix")));
+        } catch (Exception e) {
+            evaluation.setConfusionMatrix("{}");
+        }
         evaluation.setClassificationReport(generateClassificationReport(realEvaluation));
         
         return evaluationRepository.save(evaluation);
@@ -91,54 +98,59 @@ public class ModelEvaluationService {
         report.append("              precision    recall  f1-score   support\n\n");
         
         @SuppressWarnings("unchecked")
-        Map<String, Object> perClass = (Map<String, Object>) evaluation.getOrDefault("perClass", new HashMap<>());
+        Map<String, Object> perClassMetrics = (Map<String, Object>) evaluation.getOrDefault("perClassMetrics", new HashMap<>());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labelDist = (Map<String, Object>) evaluation.getOrDefault("labelDistribution", new HashMap<>());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> perClassAccuracy = (Map<String, Object>) evaluation.getOrDefault("perClassAccuracy", new HashMap<>());
         
-        String[] classNames = {"狗", "猫", "猴子", "蜜蜂", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
+        Set<String> allClasses = new TreeSet<>(labelDist.keySet());
         
         int totalSupport = 0;
-        double totalPrecision = 0;
-        double totalRecall = 0;
-        double totalF1 = 0;
-        int classCount = 0;
+        double weightedPrecision = 0;
+        double weightedRecall = 0;
+        double weightedF1 = 0;
         
-        for (String className : classNames) {
-            if (!perClass.containsKey(className)) continue;
-            
-            @SuppressWarnings("unchecked")
-            Map<String, Number> metrics = (Map<String, Number>) perClass.get(className);
-            double p = metrics.getOrDefault("precision", 0.0).doubleValue();
-            double r = metrics.getOrDefault("recall", 0.0).doubleValue();
-            double f = metrics.getOrDefault("f1Score", 0.0).doubleValue();
-            int support = metrics.getOrDefault("total", 0).intValue();
+        double macroPrecision = (double) evaluation.getOrDefault("macroPrecision", 0.0);
+        double macroRecall = (double) evaluation.getOrDefault("macroRecall", 0.0);
+        double macroF1 = (double) evaluation.getOrDefault("macroF1", 0.0);
+        double accuracy = (double) evaluation.getOrDefault("accuracy", 0.0);
+        
+        for (String className : allClasses) {
+            double p = perClassMetrics.containsKey(className + "_precision") 
+                ? ((Number) perClassMetrics.get(className + "_precision")).doubleValue() : 0.0;
+            double r = perClassMetrics.containsKey(className + "_recall") 
+                ? ((Number) perClassMetrics.get(className + "_recall")).doubleValue() : 0.0;
+            double f = perClassMetrics.containsKey(className + "_f1") 
+                ? ((Number) perClassMetrics.get(className + "_f1")).doubleValue() : 0.0;
+            int support = labelDist.containsKey(className) 
+                ? ((Number) labelDist.get(className)).intValue() : 0;
             
             if (support > 0) {
                 report.append(String.format("  %-8s     %.2f      %.2f      %.2f       %d\n",
                         className, p, r, f, support));
                 totalSupport += support;
-                totalPrecision += p * support;
-                totalRecall += r * support;
-                totalF1 += f * support;
-                classCount++;
+                weightedPrecision += p * support;
+                weightedRecall += r * support;
+                weightedF1 += f * support;
             }
         }
         
         if (totalSupport > 0) {
-            totalPrecision /= totalSupport;
-            totalRecall /= totalSupport;
-            totalF1 /= totalSupport;
+            weightedPrecision /= totalSupport;
+            weightedRecall /= totalSupport;
+            weightedF1 /= totalSupport;
         }
-        
-        double accuracy = (double) evaluation.getOrDefault("accuracy", 0.0);
         
         report.append("\n    accuracy                           ").append(String.format("%.2f", accuracy))
               .append("      ").append(totalSupport).append("\n");
-        report.append("   macro avg       ").append(String.format("%.2f", totalPrecision))
-              .append("      ").append(String.format("%.2f", totalRecall))
-              .append("      ").append(String.format("%.2f", totalF1))
+        report.append("   macro avg       ").append(String.format("%.2f", macroPrecision))
+              .append("      ").append(String.format("%.2f", macroRecall))
+              .append("      ").append(String.format("%.2f", macroF1))
               .append("       ").append(totalSupport).append("\n");
-        report.append("weighted avg       ").append(String.format("%.2f", totalPrecision))
-              .append("      ").append(String.format("%.2f", totalRecall))
-              .append("      ").append(String.format("%.2f", totalF1))
+        report.append("weighted avg       ").append(String.format("%.2f", weightedPrecision))
+              .append("      ").append(String.format("%.2f", weightedRecall))
+              .append("      ").append(String.format("%.2f", weightedF1))
               .append("       ").append(totalSupport).append("\n");
         
         return report.toString();

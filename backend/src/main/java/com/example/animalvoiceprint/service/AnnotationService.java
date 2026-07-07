@@ -86,6 +86,7 @@ public class AnnotationService {
         annotation.setStatus(request.getStatus());
         annotation.setReviewerId(reviewerId);
         annotation.setReviewRemark(request.getReviewRemark());
+        annotation.setReviewTime(java.time.LocalDateTime.now());
         
         return annotationRepository.save(annotation);
     }

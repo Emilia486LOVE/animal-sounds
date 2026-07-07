@@ -28,18 +28,21 @@ public class TrainTaskService {
     private final ModelEvaluationService modelEvaluationService;
     private final EvaluationService evaluationService;
     private final ObjectMapper objectMapper;
+    private final AnimalClassificationModel classificationModel;
     
     public TrainTaskService(TrainTaskRepository taskRepository, TrainSampleRepository sampleRepository,
                            AnnotationRecordRepository annotationRepository,
                            ModelEvaluationService modelEvaluationService,
                            EvaluationService evaluationService,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           AnimalClassificationModel classificationModel) {
         this.taskRepository = taskRepository;
         this.sampleRepository = sampleRepository;
         this.annotationRepository = annotationRepository;
         this.modelEvaluationService = modelEvaluationService;
         this.evaluationService = evaluationService;
         this.objectMapper = objectMapper;
+        this.classificationModel = classificationModel;
     }
     
     public List<TrainTask> getAllTasks() {
@@ -55,7 +58,13 @@ public class TrainTaskService {
         return taskRepository.findByStatus(status);
     }
     
+    private static final List<String> VALID_MODEL_TYPES = List.of("KNN");
+
     public TrainTask createTask(TrainTaskCreateRequest request, Integer userId) {
+        if (!VALID_MODEL_TYPES.contains(request.getModelType())) {
+            throw new BusinessException("不支持的模型类型: " + request.getModelType() + "，仅支持: " + VALID_MODEL_TYPES);
+        }
+
         TrainTask task = new TrainTask();
         task.setTaskName(request.getTaskName());
         task.setDatasetId(request.getDatasetId());
@@ -100,55 +109,77 @@ public class TrainTaskService {
     }
     
     private void executeTraining(TrainTask task) {
-        Map<String, Object> params = new HashMap<>();
         try {
-            if (task.getTrainParams() != null && !task.getTrainParams().isEmpty()) {
-                params = objectMapper.readValue(task.getTrainParams(), Map.class);
-            }
-        } catch (Exception ignored) {
-        }
-        
-        int epochs = params.get("epochs") != null ? ((Number) params.get("epochs")).intValue() : 50;
-        double learningRate = params.get("learningRate") != null ? ((Number) params.get("learningRate")).doubleValue() : 0.001;
-        
-        double bestMetric = 0.0;
-        double currentMetric = 0.3 + Math.random() * 0.2;
-        
-        int reportInterval = Math.max(1, epochs / 10);
-        
-        for (int epoch = 1; epoch <= epochs; epoch++) {
-            currentMetric = currentMetric + (Math.random() - 0.3) * 0.1;
-            currentMetric = Math.max(0.1, Math.min(0.95, currentMetric));
-            
-            if (currentMetric > bestMetric) {
-                bestMetric = currentMetric;
-            }
-            
-            task.setCurrentEpoch(epoch);
-            task.setBestValMetric(java.math.BigDecimal.valueOf(bestMetric));
-            
-            if (epoch % reportInterval == 0 || epoch == epochs) {
-                taskRepository.save(task);
-            }
-            
+            Map<String, Object> params = new HashMap<>();
             try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+                if (task.getTrainParams() != null && !task.getTrainParams().isEmpty()) {
+                    params = objectMapper.readValue(task.getTrainParams(), Map.class);
+                }
+            } catch (Exception ignored) {
             }
+
+            String distanceMetric = params.get("distanceMetric") != null 
+                ? (String) params.get("distanceMetric") : "euclidean";
+            boolean useDistanceWeighting = params.get("useDistanceWeighting") != null 
+                ? (Boolean) params.get("useDistanceWeighting") : true;
+
+            task.setCurrentEpoch(1);
+            task.setBestValMetric(java.math.BigDecimal.valueOf(0.0));
+            taskRepository.save(task);
+
+            classificationModel.setDistanceMetric(distanceMetric);
+            classificationModel.setUseDistanceWeighting(useDistanceWeighting);
+            classificationModel.trainModel();
+
+            if (!classificationModel.isTrained()) {
+                throw new RuntimeException("模型训练失败，没有可用的训练样本");
+            }
+
+            task.setCurrentEpoch(2);
+            taskRepository.save(task);
+
+            Map<String, Object> evaluation = classificationModel.evaluate();
+            double accuracy = evaluation.containsKey("error") ? 0.0 
+                : (double) evaluation.getOrDefault("accuracy", 0.0);
+
+            String modelPath = "./models/knn_model_task_" + task.getTaskId() + "_" + System.currentTimeMillis() + ".dat";
+            classificationModel.saveModelToPath(modelPath);
+
+            task.setStatus("success");
+            task.setEndTime(LocalDateTime.now());
+            task.setModelSavePath(modelPath);
+            task.setBestValMetric(java.math.BigDecimal.valueOf(accuracy));
+            taskRepository.save(task);
+
+            modelEvaluationService.generateEvaluation(task);
+            generateRealEvaluationResults(task, evaluation);
+
+        } catch (Exception e) {
+            task.setStatus("failed");
+            task.setEndTime(LocalDateTime.now());
+            task.setErrorMsg(e.getMessage());
+            taskRepository.save(task);
         }
-        
-        String modelPath = "./models/model_" + task.getTaskId() + "_" + System.currentTimeMillis() + ".h5";
-        
-        task.setStatus("success");
-        task.setEndTime(LocalDateTime.now());
-        task.setModelSavePath(modelPath);
-        task.setBestValMetric(java.math.BigDecimal.valueOf(bestMetric));
-        taskRepository.save(task);
-        
-        modelEvaluationService.generateEvaluation(task);
-        generateEvaluationResults(task, bestMetric, learningRate, epochs);
+    }
+
+    private void generateRealEvaluationResults(TrainTask task, Map<String, Object> evaluation) {
+        if (evaluation.containsKey("error")) {
+            return;
+        }
+
+        String[] taxonRanks = {"species"};
+        Map<String, Map<String, Double>> metrics = new HashMap<>();
+
+        for (String rank : taxonRanks) {
+            Map<String, Double> rankMetrics = new HashMap<>();
+            rankMetrics.put("accuracy", (double) evaluation.getOrDefault("accuracy", 0.0));
+            rankMetrics.put("precision", (double) evaluation.getOrDefault("macroPrecision", 0.0));
+            rankMetrics.put("recall", (double) evaluation.getOrDefault("macroRecall", 0.0));
+            rankMetrics.put("f1_score", (double) evaluation.getOrDefault("macroF1", 0.0));
+            metrics.put(rank, rankMetrics);
+        }
+
+        evaluationService.saveEvaluations(task.getTaskId(), metrics);
     }
     
     private void generateEvaluationResults(TrainTask task, double baseAccuracy, double learningRate, int epochs) {

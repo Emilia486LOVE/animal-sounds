@@ -16,10 +16,13 @@ public class AudioFeatureExtractor {
     private static final Logger logger = LoggerFactory.getLogger(AudioFeatureExtractor.class);
 
     private static final int SAMPLE_RATE = 44100;
-    private static final int BUFFER_SIZE = 512;
+    private static final int BUFFER_SIZE = 1024;
     private static final int MFCC_COEFFICIENTS = 13;
-    private static final int MEL_FILTERS = 26;
-    private static final int FRAME_SHIFT = 256;
+    private static final int MEL_FILTERS = 40;
+    private static final int FRAME_SHIFT = 512;
+    private static final double PRE_EMPHASIS_ALPHA = 0.9375;
+    private static final double VAD_THRESHOLD = 0.005;
+    private static final int VAD_FRAMES = 5;
 
     double[] featureMean = null;
     double[] featureStd = null;
@@ -56,6 +59,9 @@ public class AudioFeatureExtractor {
 
             double[] sampleArray = allSamples.stream().mapToDouble(Double::doubleValue).toArray();
 
+            sampleArray = preEmphasis(sampleArray);
+            sampleArray = normalizeAudio(sampleArray);
+
             for (int i = 0; i + BUFFER_SIZE <= sampleArray.length; i += FRAME_SHIFT) {
                 double[] frame = new double[BUFFER_SIZE];
                 System.arraycopy(sampleArray, i, frame, 0, BUFFER_SIZE);
@@ -76,6 +82,54 @@ public class AudioFeatureExtractor {
         }
 
         return extractCombinedFeatures(mfccFrames);
+    }
+
+    private double[] preEmphasis(double[] samples) {
+        double[] result = new double[samples.length];
+        result[0] = samples[0];
+        for (int i = 1; i < samples.length; i++) {
+            result[i] = samples[i] - PRE_EMPHASIS_ALPHA * samples[i - 1];
+        }
+        return result;
+    }
+
+    private double[] normalizeAudio(double[] samples) {
+        double max = 0;
+        for (double s : samples) {
+            if (Math.abs(s) > max) {
+                max = Math.abs(s);
+            }
+        }
+        if (max < 1e-10) {
+            return samples;
+        }
+        double[] result = new double[samples.length];
+        for (int i = 0; i < samples.length; i++) {
+            result[i] = samples[i] / max;
+        }
+        return result;
+    }
+
+    private double[] applyVAD(double[] samples) {
+        List<Double> result = new ArrayList<>();
+        int frameSize = BUFFER_SIZE;
+        int stepSize = FRAME_SHIFT;
+
+        for (int i = 0; i + frameSize <= samples.length; i += stepSize) {
+            double energy = 0;
+            for (int j = i; j < i + frameSize; j++) {
+                energy += samples[j] * samples[j];
+            }
+            energy /= frameSize;
+
+            if (energy > VAD_THRESHOLD) {
+                for (int j = i; j < Math.min(i + frameSize, samples.length); j++) {
+                    result.add(samples[j]);
+                }
+            }
+        }
+
+        return result.stream().mapToDouble(Double::doubleValue).toArray();
     }
 
     private double[] extractCombinedFeatures(List<double[]> mfccFrames) {
@@ -147,10 +201,15 @@ public class AudioFeatureExtractor {
             kurtosis[i] /= numFrames;
         }
 
+        double[] deltaMfcc = computeDelta(mfccFrames);
+        double[] deltaMean = computeMean(deltaMfcc);
+        double[] deltaStd = computeStd(deltaMfcc, deltaMean);
+
         double[] zcr = computeZCR(mfccFrames);
         double[] spectralCentroid = computeSpectralCentroid(mfccFrames);
+        double[] spectralFeatures = computeSpectralFeatures(mfccFrames);
 
-        int totalFeatures = numCoeffs * 8 + zcr.length + spectralCentroid.length;
+        int totalFeatures = numCoeffs * 8 + zcr.length + spectralCentroid.length + 2 * numCoeffs + spectralFeatures.length;
         double[] result = new double[totalFeatures];
         int idx = 0;
 
@@ -162,10 +221,40 @@ public class AudioFeatureExtractor {
         for (double v : median) result[idx++] = v;
         for (double v : skewness) result[idx++] = v;
         for (double v : kurtosis) result[idx++] = v;
+        for (double v : deltaMean) result[idx++] = v;
+        for (double v : deltaStd) result[idx++] = v;
         for (double v : zcr) result[idx++] = v;
         for (double v : spectralCentroid) result[idx++] = v;
+        for (double v : spectralFeatures) result[idx++] = v;
 
         return result;
+    }
+
+    private double[] computeDelta(List<double[]> mfccFrames) {
+        int numFrames = mfccFrames.size();
+        int numCoeffs = mfccFrames.get(0).length;
+        double[] delta = new double[numCoeffs];
+
+        for (int i = 0; i < numCoeffs; i++) {
+            double sum = 0;
+            int count = 0;
+            for (int t = 1; t < numFrames - 1; t++) {
+                sum += mfccFrames.get(t + 1)[i] - mfccFrames.get(t - 1)[i];
+                count++;
+            }
+            delta[i] = count > 0 ? sum / (2 * count) : 0;
+        }
+        return delta;
+    }
+
+    private double[] computeMean(double[] values) {
+        return new double[]{java.util.Arrays.stream(values).average().orElse(0)};
+    }
+
+    private double[] computeStd(double[] values, double[] mean) {
+        double meanVal = mean[0];
+        double variance = java.util.Arrays.stream(values).map(v -> Math.pow(v - meanVal, 2)).average().orElse(0);
+        return new double[]{Math.sqrt(variance)};
     }
 
     private double[] computeZCR(List<double[]> mfccFrames) {
@@ -210,6 +299,57 @@ public class AudioFeatureExtractor {
         result[0] = meanCentroid;
         result[1] = varCentroid;
         result[2] = Math.sqrt(varCentroid);
+        return result;
+    }
+
+    private double[] computeSpectralFeatures(List<double[]> mfccFrames) {
+        double[] result = new double[3];
+
+        double rmsSum = 0;
+        double rolloffSum = 0;
+        double bandwidthSum = 0;
+
+        for (double[] frame : mfccFrames) {
+            double rms = 0;
+            for (double v : frame) {
+                rms += v * v;
+            }
+            rms = Math.sqrt(rms / frame.length);
+            rmsSum += rms;
+
+            double cumsum = 0;
+            double total = 0;
+            for (double v : frame) {
+                total += Math.abs(v);
+            }
+            int rolloffIndex = 0;
+            for (int i = 0; i < frame.length; i++) {
+                cumsum += Math.abs(frame[i]);
+                if (cumsum >= 0.85 * total) {
+                    rolloffIndex = i;
+                    break;
+                }
+            }
+            rolloffSum += rolloffIndex;
+
+            double meanFreq = 0;
+            for (int i = 0; i < frame.length; i++) {
+                meanFreq += i * Math.abs(frame[i]);
+            }
+            meanFreq /= total > 1e-10 ? total : 1;
+
+            double bandwidth = 0;
+            for (int i = 0; i < frame.length; i++) {
+                bandwidth += Math.abs(frame[i]) * Math.pow(i - meanFreq, 2);
+            }
+            bandwidth = Math.sqrt(bandwidth / (total > 1e-10 ? total : 1));
+            bandwidthSum += bandwidth;
+        }
+
+        result[0] = rmsSum / mfccFrames.size();
+        result[1] = rolloffSum / mfccFrames.size();
+        result[2] = bandwidthSum / mfccFrames.size();
+
         return result;
     }
 

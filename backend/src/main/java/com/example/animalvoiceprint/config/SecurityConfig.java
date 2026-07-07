@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/statistics/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/datasets/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/audio/download/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/audio/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/labels/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/train/tasks").authenticated()

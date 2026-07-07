@@ -47,6 +47,9 @@ public class AnnotationRecord {
     @Column(name = "review_remark", length = 255)
     private String reviewRemark;
     
+    @Column(name = "review_time")
+    private LocalDateTime reviewTime;
+    
     @Column(name = "create_time")
     private LocalDateTime createTime;
     
@@ -89,6 +92,8 @@ public class AnnotationRecord {
     public void setReviewerId(Integer reviewerId) { this.reviewerId = reviewerId; }
     public String getReviewRemark() { return reviewRemark; }
     public void setReviewRemark(String reviewRemark) { this.reviewRemark = reviewRemark; }
+    public LocalDateTime getReviewTime() { return reviewTime; }
+    public void setReviewTime(LocalDateTime reviewTime) { this.reviewTime = reviewTime; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
     public LocalDateTime getUpdateTime() { return updateTime; }
