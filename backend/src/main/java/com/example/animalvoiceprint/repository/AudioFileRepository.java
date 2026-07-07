@@ -13,4 +13,5 @@ public interface AudioFileRepository extends JpaRepository<AudioFile, Integer> {
     List<AudioFile> findByLocationContaining(String location);
     List<AudioFile> findByUploadUserId(Integer uploadUserId);
     long countByDatasetId(Integer datasetId);
+    long countByNoiseLevel(String noiseLevel);
 }

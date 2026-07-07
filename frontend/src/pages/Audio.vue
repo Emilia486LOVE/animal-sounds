@@ -228,7 +228,8 @@ const initWaveSurfer = () => {
       responsive: true,
       height: 120
     })
-    wavesurfer.load(`/api/audio/download/${selectedAudio.value.filePath}`)
+    const fileName = selectedAudio.value.fileName
+    wavesurfer.load(`/api/audio/download/${selectedAudio.value.datasetId}/${fileName}`)
   })
 }
 

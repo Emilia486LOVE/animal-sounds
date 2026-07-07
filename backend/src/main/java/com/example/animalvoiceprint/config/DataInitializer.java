@@ -51,11 +51,8 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         System.out.println("\n=== 开始初始化测试数据 ===");
 
-        long annotationCount = annotationRepository.count();
-        long trainTaskCount = trainTaskRepository.count();
-
-        if (annotationCount >= 100 && trainTaskCount >= 5) {
-            System.out.println("数据库已存在足够测试数据，跳过初始化");
+        if (userRepository.count() > 0) {
+            System.out.println("数据已存在，跳过初始化");
             return;
         }
 
@@ -136,131 +133,203 @@ public class DataInitializer implements CommandLineRunner {
 
         List<TaxonomyLabel> labels = new ArrayList<>();
 
+        TaxonomyLabel mammal = new TaxonomyLabel();
+        mammal.setLabelName("哺乳纲");
+        mammal.setParentId(0);
+        mammal.setTaxonRank("class");
+        mammal.setDescription("哺乳动物");
+        mammal.setLabelPath("/哺乳纲");
+        mammal.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(mammal);
+
+        TaxonomyLabel birdClass = new TaxonomyLabel();
+        birdClass.setLabelName("鸟纲");
+        birdClass.setParentId(0);
+        birdClass.setTaxonRank("class");
+        birdClass.setDescription("鸟类动物");
+        birdClass.setLabelPath("/鸟纲");
+        birdClass.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(birdClass);
+
+        TaxonomyLabel insect = new TaxonomyLabel();
+        insect.setLabelName("昆虫纲");
+        insect.setParentId(0);
+        insect.setTaxonRank("class");
+        insect.setDescription("昆虫类动物");
+        insect.setLabelPath("/昆虫纲");
+        insect.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(insect);
+
         TaxonomyLabel dog = new TaxonomyLabel();
         dog.setLabelName("犬科");
-        dog.setParentId(0);
+        dog.setParentId(1);
         dog.setTaxonRank("family");
         dog.setDescription("犬科动物");
-        dog.setLabelPath("/犬科");
+        dog.setLabelPath("/哺乳纲/犬科");
         dog.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(dog);
 
         TaxonomyLabel cat = new TaxonomyLabel();
         cat.setLabelName("猫科");
-        cat.setParentId(0);
+        cat.setParentId(1);
         cat.setTaxonRank("family");
         cat.setDescription("猫科动物");
-        cat.setLabelPath("/猫科");
+        cat.setLabelPath("/哺乳纲/猫科");
         cat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(cat);
 
-        TaxonomyLabel bird = new TaxonomyLabel();
-        bird.setLabelName("鸟类");
-        bird.setParentId(0);
-        bird.setTaxonRank("class");
-        bird.setDescription("鸟类动物");
-        bird.setLabelPath("/鸟类");
-        bird.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
-        labels.add(bird);
+        TaxonomyLabel primate = new TaxonomyLabel();
+        primate.setLabelName("灵长目");
+        primate.setParentId(1);
+        primate.setTaxonRank("order");
+        primate.setDescription("灵长类动物");
+        primate.setLabelPath("/哺乳纲/灵长目");
+        primate.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(primate);
 
         TaxonomyLabel cow = new TaxonomyLabel();
         cow.setLabelName("牛科");
-        cow.setParentId(0);
+        cow.setParentId(1);
         cow.setTaxonRank("family");
         cow.setDescription("牛科动物");
-        cow.setLabelPath("/牛科");
+        cow.setLabelPath("/哺乳纲/牛科");
         cow.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(cow);
 
         TaxonomyLabel sheep = new TaxonomyLabel();
         sheep.setLabelName("羊科");
-        sheep.setParentId(0);
+        sheep.setParentId(1);
         sheep.setTaxonRank("family");
         sheep.setDescription("羊科动物");
-        sheep.setLabelPath("/羊科");
+        sheep.setLabelPath("/哺乳纲/羊科");
         sheep.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(sheep);
 
+        TaxonomyLabel passerine = new TaxonomyLabel();
+        passerine.setLabelName("雀形目");
+        passerine.setParentId(2);
+        passerine.setTaxonRank("order");
+        passerine.setDescription("雀形目鸟类");
+        passerine.setLabelPath("/鸟纲/雀形目");
+        passerine.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(passerine);
+
+        TaxonomyLabel raptor = new TaxonomyLabel();
+        raptor.setLabelName("隼形目");
+        raptor.setParentId(2);
+        raptor.setTaxonRank("order");
+        raptor.setDescription("猛禽");
+        raptor.setLabelPath("/鸟纲/隼形目");
+        raptor.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(raptor);
+
+        TaxonomyLabel hymenoptera = new TaxonomyLabel();
+        hymenoptera.setLabelName("膜翅目");
+        hymenoptera.setParentId(3);
+        hymenoptera.setTaxonRank("order");
+        hymenoptera.setDescription("膜翅目昆虫");
+        hymenoptera.setLabelPath("/昆虫纲/膜翅目");
+        hymenoptera.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(hymenoptera);
+
         TaxonomyLabel wolf = new TaxonomyLabel();
         wolf.setLabelName("狼");
-        wolf.setParentId(1);
+        wolf.setParentId(4);
         wolf.setTaxonRank("species");
         wolf.setDescription("灰狼");
-        wolf.setLabelPath("/犬科/狼");
+        wolf.setLabelPath("/哺乳纲/犬科/狼");
         wolf.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(wolf);
 
         TaxonomyLabel dogSpecie = new TaxonomyLabel();
         dogSpecie.setLabelName("狗");
-        dogSpecie.setParentId(1);
+        dogSpecie.setParentId(4);
         dogSpecie.setTaxonRank("species");
         dogSpecie.setDescription("家犬");
-        dogSpecie.setLabelPath("/犬科/狗");
+        dogSpecie.setLabelPath("/哺乳纲/犬科/狗");
         dogSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(dogSpecie);
 
         TaxonomyLabel tiger = new TaxonomyLabel();
         tiger.setLabelName("虎");
-        tiger.setParentId(2);
+        tiger.setParentId(5);
         tiger.setTaxonRank("species");
         tiger.setDescription("老虎");
-        tiger.setLabelPath("/猫科/虎");
+        tiger.setLabelPath("/哺乳纲/猫科/虎");
         tiger.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(tiger);
 
         TaxonomyLabel houseCat = new TaxonomyLabel();
         houseCat.setLabelName("猫");
-        houseCat.setParentId(2);
+        houseCat.setParentId(5);
         houseCat.setTaxonRank("species");
         houseCat.setDescription("家猫");
-        houseCat.setLabelPath("/猫科/猫");
+        houseCat.setLabelPath("/哺乳纲/猫科/猫");
         houseCat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(houseCat);
 
-        TaxonomyLabel sparrow = new TaxonomyLabel();
-        sparrow.setLabelName("麻雀");
-        sparrow.setParentId(3);
-        sparrow.setTaxonRank("species");
-        sparrow.setDescription("麻雀");
-        sparrow.setLabelPath("/鸟类/麻雀");
-        sparrow.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
-        labels.add(sparrow);
-
-        TaxonomyLabel eagle = new TaxonomyLabel();
-        eagle.setLabelName("鹰");
-        eagle.setParentId(3);
-        eagle.setTaxonRank("species");
-        eagle.setDescription("老鹰");
-        eagle.setLabelPath("/鸟类/鹰");
-        eagle.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
-        labels.add(eagle);
+        TaxonomyLabel monkey = new TaxonomyLabel();
+        monkey.setLabelName("猴子");
+        monkey.setParentId(6);
+        monkey.setTaxonRank("species");
+        monkey.setDescription("猕猴");
+        monkey.setLabelPath("/哺乳纲/灵长目/猴子");
+        monkey.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(monkey);
 
         TaxonomyLabel cowSpecie = new TaxonomyLabel();
         cowSpecie.setLabelName("牛");
-        cowSpecie.setParentId(4);
+        cowSpecie.setParentId(7);
         cowSpecie.setTaxonRank("species");
         cowSpecie.setDescription("奶牛");
-        cowSpecie.setLabelPath("/牛科/牛");
+        cowSpecie.setLabelPath("/哺乳纲/牛科/牛");
         cowSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(cowSpecie);
 
         TaxonomyLabel goat = new TaxonomyLabel();
         goat.setLabelName("山羊");
-        goat.setParentId(5);
+        goat.setParentId(8);
         goat.setTaxonRank("species");
         goat.setDescription("山羊");
-        goat.setLabelPath("/羊科/山羊");
+        goat.setLabelPath("/哺乳纲/羊科/山羊");
         goat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(goat);
 
         TaxonomyLabel sheepSpecie = new TaxonomyLabel();
         sheepSpecie.setLabelName("绵羊");
-        sheepSpecie.setParentId(5);
+        sheepSpecie.setParentId(8);
         sheepSpecie.setTaxonRank("species");
         sheepSpecie.setDescription("绵羊");
-        sheepSpecie.setLabelPath("/羊科/绵羊");
+        sheepSpecie.setLabelPath("/哺乳纲/羊科/绵羊");
         sheepSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
         labels.add(sheepSpecie);
+
+        TaxonomyLabel sparrow = new TaxonomyLabel();
+        sparrow.setLabelName("麻雀");
+        sparrow.setParentId(9);
+        sparrow.setTaxonRank("species");
+        sparrow.setDescription("麻雀");
+        sparrow.setLabelPath("/鸟纲/雀形目/麻雀");
+        sparrow.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(sparrow);
+
+        TaxonomyLabel eagle = new TaxonomyLabel();
+        eagle.setLabelName("鹰");
+        eagle.setParentId(10);
+        eagle.setTaxonRank("species");
+        eagle.setDescription("老鹰");
+        eagle.setLabelPath("/鸟纲/隼形目/鹰");
+        eagle.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(eagle);
+
+        TaxonomyLabel bee = new TaxonomyLabel();
+        bee.setLabelName("蜜蜂");
+        bee.setParentId(11);
+        bee.setTaxonRank("species");
+        bee.setDescription("蜜蜂");
+        bee.setLabelPath("/昆虫纲/膜翅目/蜜蜂");
+        bee.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(bee);
 
         labelRepository.saveAll(labels);
         System.out.println("创建了 " + labels.size() + " 个标签");
@@ -268,31 +337,39 @@ public class DataInitializer implements CommandLineRunner {
 
     private void ensureAudioFiles() {
         long existing = audioFileRepository.count();
-        if (existing >= 100) {
+        if (existing >= 150) {
             System.out.println("音频文件已足够(" + existing + "条)，跳过");
             return;
         }
 
         List<AudioFile> audioFiles = new ArrayList<>();
         String[] noiseLevels = {"low", "medium", "high", "unknown"};
-        String[] locations = {"农场", "森林", "城市", "草原", "山区"};
-        String[] animalNames = {"dog", "cat", "sparrow", "eagle", "cow", "goat", "sheep", "wolf", "tiger"};
-        String[] animalLabels = {"狗", "猫", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
+        String[] locations = {"农场", "森林", "城市", "草原", "山区", "湿地", "沙漠"};
+        String[] animalNames = {"dog", "cat", "monkey", "bee", "sparrow", "eagle", "cow", "goat", "sheep", "wolf", "tiger"};
+        String[] animalLabels = {"狗", "猫", "猴子", "蜜蜂", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
 
-        for (int i = 0; i < 100; i++) {
+        String uploadDir = System.getProperty("user.dir") + "/uploads";
+
+        for (int i = 0; i < 150; i++) {
             int animalIndex = i % animalNames.length;
-            int datasetId = (i / 20) + 1;
+            int datasetId = (i / 30) + 1;
             int locationIndex = i % locations.length;
             int noiseIndex = i % noiseLevels.length;
 
             AudioFile audio = new AudioFile();
             audio.setDatasetId(datasetId);
             audio.setFileName(animalNames[animalIndex] + "_" + String.format("%03d", i + 1) + ".wav");
-            audio.setFilePath("/uploads/dataset_" + datasetId + "/" + audio.getFileName());
-            audio.setDuration(BigDecimal.valueOf(2.0 + random.nextDouble() * 8.0).setScale(3, RoundingMode.HALF_UP));
+            
+            String realFilePath = uploadDir + "/" + datasetId + "/" + animalNames[animalIndex] + "_001.wav";
+            if (!new java.io.File(realFilePath).exists()) {
+                realFilePath = "/uploads/" + datasetId + "/" + audio.getFileName();
+            }
+            audio.setFilePath(realFilePath);
+            
+            audio.setDuration(BigDecimal.valueOf(2.0).setScale(3, RoundingMode.HALF_UP));
             audio.setSampleRate(44100);
             audio.setChannels(1);
-            audio.setFileSize((long) (100000 + random.nextLong() * 900000));
+            audio.setFileSize(176400L);
             audio.setNoiseLevel(noiseLevels[noiseIndex]);
             audio.setLocation(locations[locationIndex]);
             audio.setUploadUserId((i % 5) + 1);
@@ -308,13 +385,13 @@ public class DataInitializer implements CommandLineRunner {
 
     private void ensureAnnotations() {
         long existing = annotationRepository.count();
-        if (existing >= 100) {
+        if (existing >= 150) {
             System.out.println("标注记录已足够(" + existing + "条)，跳过");
             return;
         }
 
         List<AnnotationRecord> annotations = new ArrayList<>();
-        String[] soundTypes = {"bark", "meow", "chirp", "howl", "moo", "bleat", "roar", "purr", "squawk"};
+        String[] soundTypes = {"bark", "meow", "chirp", "howl", "moo", "bleat", "roar", "purr", "squawk", "buzz", "trill"};
         String[] remarks = {
             "清晰的叫声",
             "带有背景噪声",
@@ -325,16 +402,22 @@ public class DataInitializer implements CommandLineRunner {
             "带有颤音",
             "低沉的声音",
             "尖锐的声音",
-            "混合声音"
+            "混合声音",
+            "高频嗡嗡声",
+            "复杂鸣唱",
+            "警告叫声",
+            "求偶叫声",
+            "幼崽叫声"
         };
         String[] statuses = {"approved", "submitted", "rejected"};
 
         List<AudioFile> audioFiles = audioFileRepository.findAll();
-        List<TaxonomyLabel> labels = labelRepository.findAll();
 
-        for (int i = 0; i < 100; i++) {
+        int[] speciesLabelIds = {12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
+
+        for (int i = 0; i < 150; i++) {
             AudioFile audio = audioFiles.get(i % audioFiles.size());
-            int labelId = ((i % 9) + 6);
+            int labelId = speciesLabelIds[i % speciesLabelIds.length];
             int annotatorId = ((i % 5) + 2);
             Integer reviewerId = i % 3 == 0 ? 1 : null;
             int statusIndex = i % 3;

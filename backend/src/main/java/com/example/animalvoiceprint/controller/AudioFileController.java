@@ -75,19 +75,27 @@ public class AudioFileController {
         return ResponseEntity.ok(ApiResponse.success("音频文件已删除", null));
     }
     
-    @GetMapping("/download/{filePath}")
-    public ResponseEntity<Resource> downloadAudioFile(@PathVariable("filePath") String filePath) {
-        Resource resource = audioFileService.loadAudioFileAsResource(filePath);
+    @GetMapping("/download/{datasetId}/{fileName}")
+    public ResponseEntity<Resource> downloadAudioFile(
+            @PathVariable("datasetId") Integer datasetId,
+            @PathVariable("fileName") String fileName) {
+        Resource resource = audioFileService.loadAudioFileByDatasetAndName(datasetId, fileName);
         if (resource == null) {
             return ResponseEntity.notFound().build();
         }
         
-        String fileName = Paths.get(filePath).getFileName().toString();
-        String contentType = "audio/mpeg";
+        String contentType = "audio/wav";
+        if (fileName.toLowerCase().endsWith(".mp3")) {
+            contentType = "audio/mpeg";
+        } else if (fileName.toLowerCase().endsWith(".flac")) {
+            contentType = "audio/flac";
+        } else if (fileName.toLowerCase().endsWith(".ogg")) {
+            contentType = "audio/ogg";
+        }
         
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                 .body(resource);
     }
 }

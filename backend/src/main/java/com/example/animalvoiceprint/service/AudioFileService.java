@@ -179,4 +179,32 @@ public class AudioFileService {
             return null;
         }
     }
+    
+    public Resource loadAudioFileByDatasetAndName(Integer datasetId, String fileName) {
+        try {
+            Path path = Paths.get(uploadDir, String.valueOf(datasetId), fileName).normalize().toAbsolutePath();
+            System.out.println("尝试加载音频文件: " + path.toString());
+            
+            if (!Files.exists(path)) {
+                String baseName = fileName.substring(0, fileName.lastIndexOf('_')) + "_001.wav";
+                path = Paths.get(uploadDir, String.valueOf(datasetId), baseName).normalize().toAbsolutePath();
+                System.out.println("尝试备选路径: " + path.toString());
+            }
+            
+            if (Files.exists(path)) {
+                System.out.println("文件存在，大小: " + Files.size(path) + " bytes");
+                Resource resource = new UrlResource(path.toUri());
+                if (resource.exists() && resource.isReadable()) {
+                    return resource;
+                }
+            } else {
+                System.out.println("文件不存在");
+            }
+            
+            return null;
+        } catch (IOException e) {
+            System.out.println("加载音频文件失败: " + e.getMessage());
+            return null;
+        }
+    }
 }
