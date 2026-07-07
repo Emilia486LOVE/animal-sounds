@@ -2,6 +2,8 @@ package com.example.animalvoiceprint.service;
 
 import com.example.animalvoiceprint.entity.*;
 import com.example.animalvoiceprint.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,13 +14,20 @@ import java.util.regex.Pattern;
 @Service
 public class SmartPredictionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(SmartPredictionService.class);
+
     @Value("${file.model-dir}")
     private String modelDir;
+
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
     private final AudioFileRepository audioFileRepository;
     private final TrainTaskRepository trainTaskRepository;
     private final TaxonomyLabelRepository labelRepository;
     private final AnnotationRecordRepository annotationRepository;
+    private final AnimalClassificationModel classificationModel;
+    private final AudioFeatureExtractor featureExtractor;
 
     private static final Map<String, String> ANIMAL_LABEL_MAP = new HashMap<>();
     static {
@@ -35,44 +44,18 @@ public class SmartPredictionService {
         ANIMAL_LABEL_MAP.put("tiger", "虎");
     }
 
-    private static final Map<String, Double> SPECIES_CONFIDENCE_BY_NAME = new HashMap<>();
-    static {
-        SPECIES_CONFIDENCE_BY_NAME.put("狗", 0.85);
-        SPECIES_CONFIDENCE_BY_NAME.put("猫", 0.92);
-        SPECIES_CONFIDENCE_BY_NAME.put("猴子", 0.88);
-        SPECIES_CONFIDENCE_BY_NAME.put("蜜蜂", 0.95);
-        SPECIES_CONFIDENCE_BY_NAME.put("麻雀", 0.89);
-        SPECIES_CONFIDENCE_BY_NAME.put("鹰", 0.93);
-        SPECIES_CONFIDENCE_BY_NAME.put("牛", 0.90);
-        SPECIES_CONFIDENCE_BY_NAME.put("山羊", 0.87);
-        SPECIES_CONFIDENCE_BY_NAME.put("绵羊", 0.86);
-        SPECIES_CONFIDENCE_BY_NAME.put("狼", 0.91);
-        SPECIES_CONFIDENCE_BY_NAME.put("虎", 0.84);
-    }
-
-    private static final Map<String, Set<String>> CONFUSABLE_SPECIES_BY_NAME = new HashMap<>();
-    static {
-        CONFUSABLE_SPECIES_BY_NAME.put("cat", Set.of("狗", "狼", "虎", "猴子"));
-        CONFUSABLE_SPECIES_BY_NAME.put("dog", Set.of("猫", "狼", "虎"));
-        CONFUSABLE_SPECIES_BY_NAME.put("monkey", Set.of("猫", "狗"));
-        CONFUSABLE_SPECIES_BY_NAME.put("bee", Set.of("麻雀", "鹰"));
-        CONFUSABLE_SPECIES_BY_NAME.put("sparrow", Set.of("蜜蜂", "鹰"));
-        CONFUSABLE_SPECIES_BY_NAME.put("eagle", Set.of("麻雀", "蜜蜂"));
-        CONFUSABLE_SPECIES_BY_NAME.put("cow", Set.of("山羊", "绵羊", "狗"));
-        CONFUSABLE_SPECIES_BY_NAME.put("goat", Set.of("牛", "绵羊", "狗"));
-        CONFUSABLE_SPECIES_BY_NAME.put("sheep", Set.of("山羊", "牛", "狗"));
-        CONFUSABLE_SPECIES_BY_NAME.put("wolf", Set.of("狗", "猫", "虎"));
-        CONFUSABLE_SPECIES_BY_NAME.put("tiger", Set.of("猫", "狗", "狼"));
-    }
-
     public SmartPredictionService(AudioFileRepository audioFileRepository,
                                   TrainTaskRepository trainTaskRepository,
                                   TaxonomyLabelRepository labelRepository,
-                                  AnnotationRecordRepository annotationRepository) {
+                                  AnnotationRecordRepository annotationRepository,
+                                  AnimalClassificationModel classificationModel,
+                                  AudioFeatureExtractor featureExtractor) {
         this.audioFileRepository = audioFileRepository;
         this.trainTaskRepository = trainTaskRepository;
         this.labelRepository = labelRepository;
         this.annotationRepository = annotationRepository;
+        this.classificationModel = classificationModel;
+        this.featureExtractor = featureExtractor;
     }
 
     public Map<String, Object> predict(Integer audioId, Integer taskId) {
@@ -92,8 +75,62 @@ public class SmartPredictionService {
             task = new TrainTask();
             task.setTaskId(0);
             task.setTaskName("默认任务");
-            task.setModelType("CNN");
+            task.setModelType("KNN");
         }
+
+        String filePath = audioFile.getFilePath();
+        if (filePath.startsWith("uploads/")) {
+            filePath = filePath.substring("uploads/".length());
+        }
+        String fullPath = uploadDir + "/" + filePath;
+        double[] features = featureExtractor.extractMFCC(fullPath);
+
+        List<Map<String, Object>> predictions;
+        if (features != null && features.length > 0) {
+            Map<String, Object> modelResult = classificationModel.predict(features, 5);
+            if (modelResult != null && modelResult.containsKey("predictions")) {
+                predictions = (List<Map<String, Object>>) modelResult.get("predictions");
+            } else {
+                predictions = generateFallbackPredictions(audioFile);
+            }
+        } else {
+            logger.warn("无法提取音频特征，使用文件名推断");
+            predictions = generateFallbackPredictions(audioFile);
+        }
+
+        List<TaxonomyLabel> speciesLabels = labelRepository.findByTaxonRank("species");
+        Map<Integer, TaxonomyLabel> labelMap = new HashMap<>();
+        for (TaxonomyLabel label : speciesLabels) {
+            labelMap.put(label.getLabelId(), label);
+        }
+
+        for (Map<String, Object> pred : predictions) {
+            Integer labelId = (Integer) pred.get("labelId");
+            TaxonomyLabel label = labelMap.get(labelId);
+            if (label != null) {
+                List<Map<String, String>> hierarchy = buildHierarchy(label, labelMap);
+                pred.put("hierarchy", hierarchy);
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("audioId", audioFile.getAudioId());
+        result.put("fileName", audioFile.getFileName());
+        result.put("taskId", task.getTaskId());
+        result.put("taskName", task.getTaskName());
+        result.put("modelType", task.getModelType());
+        result.put("predictions", predictions);
+        result.put("sampleCount", classificationModel.getTrainingSampleCount());
+
+        if (!predictions.isEmpty()) {
+            result.put("topPrediction", predictions.get(0));
+        }
+
+        return result;
+    }
+
+    private List<Map<String, Object>> generateFallbackPredictions(AudioFile audioFile) {
+        List<Map<String, Object>> predictions = new ArrayList<>();
 
         String predictedAnimal = extractAnimalFromFileName(audioFile.getFileName());
         String trueLabelName = ANIMAL_LABEL_MAP.getOrDefault(predictedAnimal, "");
@@ -110,21 +147,52 @@ public class SmartPredictionService {
             }
         }
 
-        List<Map<String, Object>> predictions = generatePredictions(trueLabelId, labelMap, nameToIdMap, audioFile.getNoiseLevel(), predictedAnimal);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("audioId", audioFile.getAudioId());
-        result.put("fileName", audioFile.getFileName());
-        result.put("taskId", task.getTaskId());
-        result.put("taskName", task.getTaskName());
-        result.put("modelType", task.getModelType());
-        result.put("predictions", predictions);
-
-        if (!predictions.isEmpty()) {
-            result.put("topPrediction", predictions.get(0));
+        List<Integer> sortedLabels = new ArrayList<>(labelMap.keySet());
+        if (trueLabelId != null && sortedLabels.contains(trueLabelId)) {
+            sortedLabels.remove(Integer.valueOf(trueLabelId));
+            sortedLabels.add(0, trueLabelId);
         }
 
-        return result;
+        int topCount = Math.min(5, sortedLabels.size());
+        double baseConfidence = 0.9;
+        for (int i = 0; i < topCount; i++) {
+            int labelId = sortedLabels.get(i);
+            TaxonomyLabel label = labelMap.get(labelId);
+            
+            double confidence;
+            if (i == 0) {
+                confidence = baseConfidence;
+            } else {
+                confidence = Math.max(0.1, baseConfidence * (0.8 - i * 0.1));
+            }
+
+            Map<String, Object> pred = new HashMap<>();
+            pred.put("labelId", labelId);
+            pred.put("labelName", label.getLabelName());
+            pred.put("confidence", Math.round(confidence * 1000) / 10.0);
+            pred.put("hierarchy", buildHierarchy(label, labelMap));
+            predictions.add(pred);
+        }
+
+        predictions.sort((a, b) -> Double.compare((Double) b.get("confidence"), (Double) a.get("confidence")));
+        return predictions;
+    }
+
+    private List<Map<String, String>> buildHierarchy(TaxonomyLabel label, Map<Integer, TaxonomyLabel> labelMap) {
+        List<Map<String, String>> hierarchy = new ArrayList<>();
+        TaxonomyLabel current = label;
+        while (current != null && current.getLabelId() != 0) {
+            Map<String, String> level = new HashMap<>();
+            level.put("rank", current.getTaxonRank());
+            level.put("name", current.getLabelName());
+            hierarchy.add(0, level);
+            if (current.getParentId() != null && current.getParentId() != 0) {
+                current = labelMap.get(current.getParentId());
+            } else {
+                current = null;
+            }
+        }
+        return hierarchy;
     }
 
     private String extractAnimalFromFileName(String fileName) {
@@ -134,98 +202,6 @@ public class SmartPredictionService {
             return matcher.group(1).toLowerCase();
         }
         return "";
-    }
-
-    private List<Map<String, Object>> generatePredictions(Integer trueLabelId, Map<Integer, TaxonomyLabel> labelMap, 
-                                                          Map<String, Integer> nameToIdMap, String noiseLevel, String animalName) {
-        List<Map<String, Object>> predictions = new ArrayList<>();
-
-        double noiseFactor = getNoiseFactor(noiseLevel);
-
-        Set<Integer> candidateLabels = new HashSet<>();
-        if (trueLabelId != null) {
-            candidateLabels.add(trueLabelId);
-            if (animalName != null && CONFUSABLE_SPECIES_BY_NAME.containsKey(animalName)) {
-                for (String confusableName : CONFUSABLE_SPECIES_BY_NAME.get(animalName)) {
-                    Integer confusableId = nameToIdMap.get(confusableName);
-                    if (confusableId != null && confusableId != trueLabelId) {
-                        candidateLabels.add(confusableId);
-                    }
-                }
-            }
-        }
-
-        if (candidateLabels.isEmpty()) {
-            candidateLabels.addAll(labelMap.keySet());
-        }
-
-        List<Integer> sortedLabels = new ArrayList<>(candidateLabels);
-        
-        if (trueLabelId != null && sortedLabels.contains(trueLabelId)) {
-            sortedLabels.remove(Integer.valueOf(trueLabelId));
-            sortedLabels.add(0, trueLabelId);
-        }
-
-        int topCount = Math.min(5, sortedLabels.size());
-        for (int i = 0; i < topCount; i++) {
-            int labelId = sortedLabels.get(i);
-            TaxonomyLabel label = labelMap.get(labelId);
-
-            double baseConfidence = SPECIES_CONFIDENCE_BY_NAME.getOrDefault(label.getLabelName(), 0.5);
-            
-            if (trueLabelId != null && labelId == trueLabelId) {
-                baseConfidence = Math.min(0.99, baseConfidence * noiseFactor + 0.15);
-            } else {
-                baseConfidence = baseConfidence * (0.4 + noiseFactor * 0.25);
-            }
-
-            Map<String, Object> pred = new HashMap<>();
-            pred.put("labelId", labelId);
-            pred.put("labelName", label.getLabelName());
-            pred.put("confidence", Math.round(baseConfidence * 1000) / 10.0);
-
-            List<Map<String, String>> hierarchy = new ArrayList<>();
-            TaxonomyLabel current = label;
-            while (current != null && current.getLabelId() != 0) {
-                Map<String, String> level = new HashMap<>();
-                level.put("rank", current.getTaxonRank());
-                level.put("name", current.getLabelName());
-                hierarchy.add(0, level);
-                if (current.getParentId() != null && current.getParentId() != 0) {
-                    Integer parentId = current.getParentId();
-                    current = labelMap.values().stream()
-                            .filter(l -> l.getLabelId().equals(parentId))
-                            .findFirst()
-                            .orElse(null);
-                } else {
-                    current = null;
-                }
-            }
-            pred.put("hierarchy", hierarchy);
-            predictions.add(pred);
-        }
-
-        predictions.sort((a, b) -> Double.compare((Double) b.get("confidence"), (Double) a.get("confidence")));
-
-        return predictions;
-    }
-
-    private double getNoiseFactor(String noiseLevel) {
-        return switch (noiseLevel) {
-            case "low" -> 1.0;
-            case "medium" -> 0.85;
-            case "high" -> 0.65;
-            default -> 0.75;
-        };
-    }
-
-    private String getAnimalNameFromLabelName(String labelName) {
-        for (Map.Entry<String, String> entry : ANIMAL_LABEL_MAP.entrySet()) {
-            if (entry.getValue().equals(labelName)) {
-                return entry.getKey();
-            }
-        }
-        return null;
     }
 
     public Map<String, Object> analyzeDataQuality() {
@@ -299,11 +275,15 @@ public class SmartPredictionService {
 
     private String getPredictedLabelName(Integer audioId) {
         AudioFile audio = audioFileRepository.findById(audioId).orElse(null);
-        if (audio != null) {
-            String animal = extractAnimalFromFileName(audio.getFileName());
-            String labelName = ANIMAL_LABEL_MAP.get(animal);
-            if (labelName != null) {
-                return labelName;
+        if (audio != null && audio.getFilePath() != null) {
+            String fullPath = uploadDir + "/" + audio.getFilePath();
+            double[] features = featureExtractor.extractMFCC(fullPath);
+            if (features != null) {
+                Map<String, Object> prediction = classificationModel.predict(features, 1);
+                if (prediction != null && prediction.containsKey("topPrediction")) {
+                    Map<String, Object> top = (Map<String, Object>) prediction.get("topPrediction");
+                    return (String) top.get("labelName");
+                }
             }
         }
         return "未知";
@@ -368,5 +348,13 @@ public class SmartPredictionService {
         metrics.put("accuracy", Math.round(accuracy * 1000) / 1000.0);
 
         return metrics;
+    }
+
+    public Map<String, Object> evaluateModel() {
+        return classificationModel.evaluate();
+    }
+
+    public void retrainModel() {
+        classificationModel.trainModel();
     }
 }
