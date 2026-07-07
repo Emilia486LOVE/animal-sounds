@@ -1,58 +1,15 @@
 <template>
-  <div
-    style="
-      minHeight: '100vh';
-      display: 'flex';
-      alignItems: 'center';
-      justifyContent: 'center';
-      backgroundColor: '#121826';
-      backgroundImage: `
-        linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px)
-      `;
-      backgroundSize: '20px 20px';
-    "
-  >
-    <el-card
-      style="
-        width: 460px;
-        backgroundColor: '#1A2233';
-        border: '1px solid #2A3344';
-        borderRadius: 12;
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)';
-      "
-    >
+  <div class="register-container">
+    <el-card class="register-card">
       <template #header>
-        <div style="textAlign: 'center'">
-          <div
-            style="
-              width: 64px;
-              height: 64px;
-              backgroundColor: '#165DFF';
-              borderRadius: 16;
-              display: 'flex';
-              alignItems: 'center';
-              justifyContent: 'center';
-              margin: '0 auto 16px';
-            "
-          >
-            <el-icon :size="32" style="color: '#fff'">
-              <audio />
+        <div class="register-header">
+          <div class="register-icon">
+            <el-icon :size="32" class="register-icon-inner">
+              <Mic />
             </el-icon>
           </div>
-          <h1
-            style="
-              fontSize: 24;
-              fontWeight: 600;
-              color: '#E5E6EB';
-              marginBottom: 8;
-            "
-          >
-            注册账号
-          </h1>
-          <p style="fontSize: 14; color: '#86909C'">
-            创建您的动物声纹系统账号
-          </p>
+          <h1 class="register-title">注册账号</h1>
+          <p class="register-subtitle">创建您的动物声纹系统账号</p>
         </div>
       </template>
 
@@ -62,8 +19,11 @@
             v-model="form.username"
             placeholder="请输入用户名（字母、数字、下划线）"
             size="large"
-            prefix-icon="User"
-          />
+          >
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item label="真实姓名" prop="realName">
@@ -71,8 +31,11 @@
             v-model="form.realName"
             placeholder="请输入真实姓名（选填）"
             size="large"
-            prefix-icon="User"
-          />
+          >
+            <template #prefix>
+              <el-icon><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item label="密码" prop="password">
@@ -81,8 +44,11 @@
             type="password"
             placeholder="请输入密码（至少6位，包含字母和数字）"
             size="large"
-            prefix-icon="Lock"
-          />
+          >
+            <template #prefix>
+              <el-icon><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item label="确认密码" prop="confirmPassword">
@@ -91,37 +57,34 @@
             type="password"
             placeholder="请再次输入密码"
             size="large"
-            prefix-icon="Lock"
-          />
+          >
+            <template #prefix>
+              <el-icon><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item label="验证码" prop="captchaCode">
-          <div style="display: 'flex'; gap: 12">
+          <div class="captcha-row">
             <el-input
               v-model="form.captchaCode"
               placeholder="请输入图片中的字母"
               size="large"
-              style="flex: 1"
+              class="captcha-input"
             />
-            <div style="display: 'flex'; alignItems: 'center'">
+            <div class="captcha-action">
               <el-button
                 type="text"
                 icon="Refresh"
                 @click="refreshCaptcha"
                 :loading="captchaLoading"
-                style="padding: 0; marginRight: 8"
+                class="captcha-refresh"
               />
               <img
                 :src="captchaImage"
                 alt="验证码"
                 @click="refreshCaptcha"
-                style="
-                  width: 120;
-                  height: 40;
-                  cursor: 'pointer';
-                  borderRadius: 4;
-                  border: '1px solid #2A3344';
-                "
+                class="captcha-image"
               />
             </div>
           </div>
@@ -133,7 +96,7 @@
             native-type="submit"
             :loading="loading"
             size="large"
-            style="width: '100%'; height: 44"
+            class="register-btn"
             @click="handleRegister"
           >
             注册
@@ -141,10 +104,8 @@
         </el-form-item>
       </el-form>
 
-      <div style="textAlign: 'center'; marginTop: 20">
-        <p style="fontSize: 12; color: '#646D7A'">
-          已有账号？<a href="/login" style="color: '#165DFF'">立即登录</a>
-        </p>
+      <div class="register-footer">
+        <p class="register-hint">已有账号？<a href="/login" class="register-link">立即登录</a></p>
       </div>
     </el-card>
   </div>
@@ -154,6 +115,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { register, getCaptcha } from '../api/auth'
+import { Mic, User, Lock } from '@element-plus/icons-vue'
 
 const loading = ref(false)
 const captchaLoading = ref(false)
@@ -257,3 +219,133 @@ onMounted(() => {
   refreshCaptcha()
 })
 </script>
+
+<style scoped>
+.register-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-global);
+  background-image: 
+    linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px);
+  background-size: 20px 20px;
+  padding: 16px;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 460px;
+  background-color: var(--color-bg-module);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.register-header {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.register-icon {
+  width: 64px;
+  height: 64px;
+  background-color: var(--color-brand-primary);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.register-icon-inner {
+  color: #fff;
+}
+
+.register-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.register-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.captcha-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.captcha-input {
+  flex: 1;
+}
+
+.captcha-action {
+  display: flex;
+  align-items: center;
+}
+
+.captcha-refresh {
+  padding: 0;
+  margin-right: 8px;
+}
+
+.captcha-image {
+  width: 120px;
+  height: 40px;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+
+.register-btn {
+  width: 100%;
+  height: 44px;
+}
+
+.register-footer {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.register-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.register-link {
+  color: var(--color-brand-primary);
+  text-decoration: none;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+  }
+  
+  .register-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+  
+  .register-title {
+    font-size: 20px;
+  }
+  
+  .captcha-image {
+    width: 100px;
+  }
+}
+</style>

@@ -1,370 +1,503 @@
 package com.example.animalvoiceprint.config;
 
-import com.example.animalvoiceprint.entity.AudioFile;
-import com.example.animalvoiceprint.entity.Dataset;
-import com.example.animalvoiceprint.entity.SysUser;
-import com.example.animalvoiceprint.entity.TaxonomyLabel;
-import com.example.animalvoiceprint.repository.AudioFileRepository;
-import com.example.animalvoiceprint.repository.DatasetRepository;
-import com.example.animalvoiceprint.repository.SysUserRepository;
-import com.example.animalvoiceprint.repository.TaxonomyLabelRepository;
+import com.example.animalvoiceprint.entity.*;
+import com.example.animalvoiceprint.repository.*;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
-    
+
     private final SysUserRepository userRepository;
     private final DatasetRepository datasetRepository;
     private final TaxonomyLabelRepository labelRepository;
     private final AudioFileRepository audioFileRepository;
-    private final PasswordEncoder passwordEncoder;
-    
-    private static final String AUDIO_DIR = "./audio_files";
-    
-    public DataInitializer(SysUserRepository userRepository, 
+    private final AnnotationRecordRepository annotationRepository;
+    private final TrainTaskRepository trainTaskRepository;
+    private final ModelEvaluationRepository modelEvaluationRepository;
+    private final EvaluationResultRepository evaluationResultRepository;
+
+    private final Random random = new Random(42);
+    private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    public DataInitializer(SysUserRepository userRepository,
                           DatasetRepository datasetRepository,
                           TaxonomyLabelRepository labelRepository,
                           AudioFileRepository audioFileRepository,
-                          PasswordEncoder passwordEncoder) {
+                          AnnotationRecordRepository annotationRepository,
+                          TrainTaskRepository trainTaskRepository,
+                          ModelEvaluationRepository modelEvaluationRepository,
+                          EvaluationResultRepository evaluationResultRepository) {
         this.userRepository = userRepository;
         this.datasetRepository = datasetRepository;
         this.labelRepository = labelRepository;
         this.audioFileRepository = audioFileRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.annotationRepository = annotationRepository;
+        this.trainTaskRepository = trainTaskRepository;
+        this.modelEvaluationRepository = modelEvaluationRepository;
+        this.evaluationResultRepository = evaluationResultRepository;
     }
-    
+
     @Override
-    public void run(String... args) {
-        initializeUsers();
-        initializeLabels();
-        initializeDatasets();
-        initializeAudioFiles();
-    }
-    
-    private void initializeUsers() {
-        if (!userRepository.existsByUsername("admin")) {
-            SysUser admin = new SysUser();
-            admin.setUsername("admin");
-            admin.setPasswordHash(passwordEncoder.encode("password"));
-            admin.setRealName("系统管理员");
-            admin.setRole("admin");
-            admin.setStatus(1);
-            userRepository.save(admin);
-        }
-        
-        if (!userRepository.existsByUsername("annotator")) {
-            SysUser annotator = new SysUser();
-            annotator.setUsername("annotator");
-            annotator.setPasswordHash(passwordEncoder.encode("password"));
-            annotator.setRealName("标注员");
-            annotator.setRole("annotator");
-            annotator.setStatus(1);
-            userRepository.save(annotator);
-        }
-        
-        if (!userRepository.existsByUsername("algorithm")) {
-            SysUser algorithm = new SysUser();
-            algorithm.setUsername("algorithm");
-            algorithm.setPasswordHash(passwordEncoder.encode("password"));
-            algorithm.setRealName("算法工程师");
-            algorithm.setRole("algorithm");
-            algorithm.setStatus(1);
-            userRepository.save(algorithm);
-        }
-        
-        if (!userRepository.existsByUsername("guest")) {
-            SysUser guest = new SysUser();
-            guest.setUsername("guest");
-            guest.setPasswordHash(passwordEncoder.encode("password"));
-            guest.setRealName("访客");
-            guest.setRole("guest");
-            guest.setStatus(1);
-            userRepository.save(guest);
-        }
-    }
-    
-    private void initializeLabels() {
-        if (labelRepository.count() > 0) {
+    public void run(String... args) throws Exception {
+        System.out.println("\n=== 开始初始化测试数据 ===");
+
+        long annotationCount = annotationRepository.count();
+        long trainTaskCount = trainTaskRepository.count();
+
+        if (annotationCount >= 100 && trainTaskCount >= 5) {
+            System.out.println("数据库已存在足够测试数据，跳过初始化");
             return;
         }
-        
-        List<TaxonomyLabel> labels = new ArrayList<>();
-        
-        labels.add(createLabel("动物界", 0, "kingdom", "动物界", "0/1"));
-        labels.add(createLabel("脊索动物门", 1, "phylum", "脊索动物门", "0/1/2"));
-        labels.add(createLabel("节肢动物门", 1, "phylum", "节肢动物门", "0/1/3"));
-        labels.add(createLabel("哺乳纲", 2, "class", "哺乳纲", "0/1/2/4"));
-        labels.add(createLabel("鸟纲", 2, "class", "鸟纲", "0/1/2/5"));
-        labels.add(createLabel("两栖纲", 2, "class", "两栖纲", "0/1/2/6"));
-        labels.add(createLabel("昆虫纲", 3, "class", "昆虫纲", "0/1/3/7"));
-        labels.add(createLabel("食肉目", 4, "order", "食肉目", "0/1/2/4/8"));
-        labels.add(createLabel("灵长目", 4, "order", "灵长目", "0/1/2/4/9"));
-        labels.add(createLabel("偶蹄目", 4, "order", "偶蹄目", "0/1/2/4/10"));
-        labels.add(createLabel("雀形目", 5, "order", "雀形目", "0/1/2/5/11"));
-        labels.add(createLabel("隼形目", 5, "order", "隼形目", "0/1/2/5/12"));
-        labels.add(createLabel("鸮形目", 5, "order", "鸮形目", "0/1/2/5/13"));
-        labels.add(createLabel("无尾目", 6, "order", "无尾目", "0/1/2/6/14"));
-        labels.add(createLabel("半翅目", 7, "order", "半翅目", "0/1/3/7/15"));
-        labels.add(createLabel("膜翅目", 7, "order", "膜翅目", "0/1/3/7/16"));
-        labels.add(createLabel("直翅目", 7, "order", "直翅目", "0/1/3/7/17"));
-        labels.add(createLabel("猫科", 8, "family", "猫科", "0/1/2/4/8/18"));
-        labels.add(createLabel("犬科", 8, "family", "犬科", "0/1/2/4/8/19"));
-        labels.add(createLabel("象科", 10, "family", "象科", "0/1/2/4/10/20"));
-        labels.add(createLabel("猴科", 9, "family", "猴科", "0/1/2/4/9/21"));
-        labels.add(createLabel("熊科", 8, "family", "熊科", "0/1/2/4/8/22"));
-        labels.add(createLabel("麻雀科", 11, "family", "麻雀科", "0/1/2/5/11/23"));
-        labels.add(createLabel("鸦科", 11, "family", "鸦科", "0/1/2/5/11/24"));
-        labels.add(createLabel("鸠鸽科", 11, "family", "鸠鸽科", "0/1/2/5/11/25"));
-        labels.add(createLabel("鹰科", 12, "family", "鹰科", "0/1/2/5/12/26"));
-        labels.add(createLabel("鸱鸮科", 13, "family", "鸱鸮科", "0/1/2/5/13/27"));
-        labels.add(createLabel("蝉科", 15, "family", "蝉科", "0/1/3/7/15/28"));
-        labels.add(createLabel("蜜蜂科", 16, "family", "蜜蜂科", "0/1/3/7/16/29"));
-        labels.add(createLabel("蟋蟀科", 17, "family", "蟋蟀科", "0/1/3/7/17/30"));
-        labels.add(createLabel("蛙科", 14, "family", "蛙科", "0/1/2/6/14/31"));
-        labels.add(createLabel("蟾蜍科", 14, "family", "蟾蜍科", "0/1/2/6/14/32"));
-        labels.add(createLabel("猫属", 18, "genus", "猫属", "0/1/2/4/8/18/33"));
-        labels.add(createLabel("豹属", 18, "genus", "豹属", "0/1/2/4/8/18/34"));
-        labels.add(createLabel("犬属", 19, "genus", "犬属", "0/1/2/4/8/19/35"));
-        labels.add(createLabel("象属", 20, "genus", "象属", "0/1/2/4/10/20/36"));
-        labels.add(createLabel("猕猴属", 21, "genus", "猕猴属", "0/1/2/4/9/21/37"));
-        labels.add(createLabel("熊属", 22, "genus", "熊属", "0/1/2/4/8/22/38"));
-        labels.add(createLabel("麻雀属", 23, "genus", "麻雀属", "0/1/2/5/11/23/39"));
-        labels.add(createLabel("喜鹊属", 24, "genus", "喜鹊属", "0/1/2/5/11/24/40"));
-        labels.add(createLabel("乌鸦属", 24, "genus", "乌鸦属", "0/1/2/5/11/24/41"));
-        labels.add(createLabel("鸽属", 25, "genus", "鸽属", "0/1/2/5/11/25/42"));
-        labels.add(createLabel("鹰属", 26, "genus", "鹰属", "0/1/2/5/12/26/43"));
-        labels.add(createLabel("鸮属", 27, "genus", "鸮属", "0/1/2/5/13/27/44"));
-        labels.add(createLabel("蝉属", 28, "genus", "蝉属", "0/1/3/7/15/28/45"));
-        labels.add(createLabel("蜜蜂属", 29, "genus", "蜜蜂属", "0/1/3/7/16/29/46"));
-        labels.add(createLabel("蟋蟀属", 30, "genus", "蟋蟀属", "0/1/3/7/17/30/47"));
-        labels.add(createLabel("蛙属", 31, "genus", "蛙属", "0/1/2/6/14/31/48"));
-        labels.add(createLabel("蟾蜍属", 32, "genus", "蟾蜍属", "0/1/2/6/14/32/49"));
-        
-        labels.add(createLabel("家猫", 33, "species", "家猫", "0/1/2/4/8/18/33/50"));
-        labels.add(createLabel("老虎", 34, "species", "老虎", "0/1/2/4/8/18/34/51"));
-        labels.add(createLabel("狮子", 34, "species", "狮子", "0/1/2/4/8/18/34/52"));
-        labels.add(createLabel("狗", 35, "species", "狗", "0/1/2/4/8/19/35/53"));
-        labels.add(createLabel("狼", 35, "species", "狼", "0/1/2/4/8/19/35/54"));
-        labels.add(createLabel("大象", 36, "species", "大象", "0/1/2/4/10/20/36/55"));
-        labels.add(createLabel("猴子", 37, "species", "猴子", "0/1/2/4/9/21/37/56"));
-        labels.add(createLabel("熊", 38, "species", "熊", "0/1/2/4/8/22/38/57"));
-        labels.add(createLabel("麻雀", 39, "species", "麻雀", "0/1/2/5/11/23/39/58"));
-        labels.add(createLabel("喜鹊", 40, "species", "喜鹊", "0/1/2/5/11/24/40/59"));
-        labels.add(createLabel("乌鸦", 41, "species", "乌鸦", "0/1/2/5/11/24/41/60"));
-        labels.add(createLabel("鸽子", 42, "species", "鸽子", "0/1/2/5/11/25/42/61"));
-        labels.add(createLabel("鹰", 43, "species", "鹰", "0/1/2/5/12/26/43/62"));
-        labels.add(createLabel("猫头鹰", 44, "species", "猫头鹰", "0/1/2/5/13/27/44/63"));
-        labels.add(createLabel("蝉", 45, "species", "蝉", "0/1/3/7/15/28/45/64"));
-        labels.add(createLabel("蜜蜂", 46, "species", "蜜蜂", "0/1/3/7/16/29/46/65"));
-        labels.add(createLabel("蟋蟀", 47, "species", "蟋蟀", "0/1/3/7/17/30/47/66"));
-        labels.add(createLabel("青蛙", 48, "species", "青蛙", "0/1/2/6/14/31/48/67"));
-        labels.add(createLabel("蟾蜍", 49, "species", "蟾蜍", "0/1/2/6/14/32/49/68"));
-        
-        labelRepository.saveAll(labels);
+
+        createUsers();
+        createDatasets();
+        createLabels();
+        ensureAudioFiles();
+        ensureAnnotations();
+        ensureTrainTasks();
+        ensureEvaluations();
+
+        System.out.println("=== 测试数据初始化完成 ===");
     }
-    
-    private TaxonomyLabel createLabel(String name, int parentId, String rank, String description, String path) {
-        TaxonomyLabel label = new TaxonomyLabel();
-        label.setLabelName(name);
-        label.setParentId(parentId);
-        label.setTaxonRank(rank);
-        label.setDescription(description);
-        label.setLabelPath(path);
-        return label;
-    }
-    
-    private void initializeDatasets() {
-        if (datasetRepository.count() > 0) {
-            return;
+
+    private void createUsers() {
+        if (userRepository.count() > 0) return;
+
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        List<SysUser> users = new ArrayList<>();
+
+        SysUser admin = new SysUser();
+        admin.setUsername("admin");
+        admin.setPasswordHash(encoder.encode("password"));
+        admin.setRealName("系统管理员");
+        admin.setRole("admin");
+        admin.setStatus(1);
+        admin.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        users.add(admin);
+
+        String[] annotators = {"annotator1", "annotator2", "annotator3", "annotator4", "annotator5"};
+        String[] realNames = {"张三", "李四", "王五", "赵六", "钱七"};
+
+        for (int i = 0; i < annotators.length; i++) {
+            SysUser user = new SysUser();
+            user.setUsername(annotators[i]);
+            user.setPasswordHash(encoder.encode("password"));
+            user.setRealName(realNames[i]);
+            user.setRole("annotator");
+            user.setStatus(1);
+            user.setCreateTime(LocalDateTime.parse("2024-01-0" + (i + 2) + " 10:00:00", dtf));
+            users.add(user);
         }
-        
+
+        userRepository.saveAll(users);
+        System.out.println("创建了 " + users.size() + " 个用户");
+    }
+
+    private void createDatasets() {
+        if (datasetRepository.count() > 0) return;
+
         List<Dataset> datasets = new ArrayList<>();
-        
-        Dataset mainDataset = new Dataset();
-        mainDataset.setDatasetName("动物叫声数据集");
-        mainDataset.setDescription("包含多种动物的叫声录音，用于声纹识别和分类训练");
-        mainDataset.setCreateUserId(1);
-        mainDataset.setAudioCount(20);
-        datasets.add(mainDataset);
-        
-        Dataset birdsDataset = new Dataset();
-        birdsDataset.setDatasetName("鸟类数据集");
-        birdsDataset.setDescription("鸟类声纹数据");
-        birdsDataset.setCreateUserId(1);
-        birdsDataset.setAudioCount(6);
-        datasets.add(birdsDataset);
-        
-        Dataset mammalsDataset = new Dataset();
-        mammalsDataset.setDatasetName("哺乳动物数据集");
-        mammalsDataset.setDescription("哺乳动物声纹数据");
-        mammalsDataset.setCreateUserId(1);
-        mammalsDataset.setAudioCount(8);
-        datasets.add(mammalsDataset);
-        
-        Dataset insectsDataset = new Dataset();
-        insectsDataset.setDatasetName("昆虫数据集");
-        insectsDataset.setDescription("昆虫声纹数据");
-        insectsDataset.setCreateUserId(1);
-        insectsDataset.setAudioCount(4);
-        datasets.add(insectsDataset);
-        
-        Dataset amphibiansDataset = new Dataset();
-        amphibiansDataset.setDatasetName("两栖动物数据集");
-        amphibiansDataset.setDescription("两栖动物声纹数据");
-        amphibiansDataset.setCreateUserId(1);
-        amphibiansDataset.setAudioCount(2);
-        datasets.add(amphibiansDataset);
-        
+
+        String[] names = {"犬科动物声纹数据集", "猫科动物声纹数据集", "鸟类声纹数据集", "家畜声纹数据集", "野生动物声纹数据集"};
+        String[] descriptions = {
+            "包含各种犬类的叫声样本，包括吠叫、呜咽、低吼等",
+            "包含各种猫类的声音样本，包括喵喵叫、咕噜声、嘶嘶声等",
+            "包含各种鸟类的鸣叫声样本",
+            "包含牛、羊、猪等家畜的声音样本",
+            "包含狼、鹿、熊等野生动物的声音样本"
+        };
+
+        for (int i = 0; i < names.length; i++) {
+            Dataset dataset = new Dataset();
+            dataset.setDatasetName(names[i]);
+            dataset.setDescription(descriptions[i]);
+            dataset.setCreateUserId(1);
+            dataset.setAudioCount(0);
+            dataset.setCreateTime(LocalDateTime.parse("2024-02-0" + (i + 1) + " 08:00:00", dtf));
+            datasets.add(dataset);
+        }
+
         datasetRepository.saveAll(datasets);
+        System.out.println("创建了 " + datasets.size() + " 个数据集");
     }
-    
-    private void initializeAudioFiles() {
-        if (audioFileRepository.count() > 0) {
+
+    private void createLabels() {
+        if (labelRepository.count() > 0) return;
+
+        List<TaxonomyLabel> labels = new ArrayList<>();
+
+        TaxonomyLabel dog = new TaxonomyLabel();
+        dog.setLabelName("犬科");
+        dog.setParentId(0);
+        dog.setTaxonRank("family");
+        dog.setDescription("犬科动物");
+        dog.setLabelPath("/犬科");
+        dog.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(dog);
+
+        TaxonomyLabel cat = new TaxonomyLabel();
+        cat.setLabelName("猫科");
+        cat.setParentId(0);
+        cat.setTaxonRank("family");
+        cat.setDescription("猫科动物");
+        cat.setLabelPath("/猫科");
+        cat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(cat);
+
+        TaxonomyLabel bird = new TaxonomyLabel();
+        bird.setLabelName("鸟类");
+        bird.setParentId(0);
+        bird.setTaxonRank("class");
+        bird.setDescription("鸟类动物");
+        bird.setLabelPath("/鸟类");
+        bird.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(bird);
+
+        TaxonomyLabel cow = new TaxonomyLabel();
+        cow.setLabelName("牛科");
+        cow.setParentId(0);
+        cow.setTaxonRank("family");
+        cow.setDescription("牛科动物");
+        cow.setLabelPath("/牛科");
+        cow.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(cow);
+
+        TaxonomyLabel sheep = new TaxonomyLabel();
+        sheep.setLabelName("羊科");
+        sheep.setParentId(0);
+        sheep.setTaxonRank("family");
+        sheep.setDescription("羊科动物");
+        sheep.setLabelPath("/羊科");
+        sheep.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(sheep);
+
+        TaxonomyLabel wolf = new TaxonomyLabel();
+        wolf.setLabelName("狼");
+        wolf.setParentId(1);
+        wolf.setTaxonRank("species");
+        wolf.setDescription("灰狼");
+        wolf.setLabelPath("/犬科/狼");
+        wolf.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(wolf);
+
+        TaxonomyLabel dogSpecie = new TaxonomyLabel();
+        dogSpecie.setLabelName("狗");
+        dogSpecie.setParentId(1);
+        dogSpecie.setTaxonRank("species");
+        dogSpecie.setDescription("家犬");
+        dogSpecie.setLabelPath("/犬科/狗");
+        dogSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(dogSpecie);
+
+        TaxonomyLabel tiger = new TaxonomyLabel();
+        tiger.setLabelName("虎");
+        tiger.setParentId(2);
+        tiger.setTaxonRank("species");
+        tiger.setDescription("老虎");
+        tiger.setLabelPath("/猫科/虎");
+        tiger.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(tiger);
+
+        TaxonomyLabel houseCat = new TaxonomyLabel();
+        houseCat.setLabelName("猫");
+        houseCat.setParentId(2);
+        houseCat.setTaxonRank("species");
+        houseCat.setDescription("家猫");
+        houseCat.setLabelPath("/猫科/猫");
+        houseCat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(houseCat);
+
+        TaxonomyLabel sparrow = new TaxonomyLabel();
+        sparrow.setLabelName("麻雀");
+        sparrow.setParentId(3);
+        sparrow.setTaxonRank("species");
+        sparrow.setDescription("麻雀");
+        sparrow.setLabelPath("/鸟类/麻雀");
+        sparrow.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(sparrow);
+
+        TaxonomyLabel eagle = new TaxonomyLabel();
+        eagle.setLabelName("鹰");
+        eagle.setParentId(3);
+        eagle.setTaxonRank("species");
+        eagle.setDescription("老鹰");
+        eagle.setLabelPath("/鸟类/鹰");
+        eagle.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(eagle);
+
+        TaxonomyLabel cowSpecie = new TaxonomyLabel();
+        cowSpecie.setLabelName("牛");
+        cowSpecie.setParentId(4);
+        cowSpecie.setTaxonRank("species");
+        cowSpecie.setDescription("奶牛");
+        cowSpecie.setLabelPath("/牛科/牛");
+        cowSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(cowSpecie);
+
+        TaxonomyLabel goat = new TaxonomyLabel();
+        goat.setLabelName("山羊");
+        goat.setParentId(5);
+        goat.setTaxonRank("species");
+        goat.setDescription("山羊");
+        goat.setLabelPath("/羊科/山羊");
+        goat.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(goat);
+
+        TaxonomyLabel sheepSpecie = new TaxonomyLabel();
+        sheepSpecie.setLabelName("绵羊");
+        sheepSpecie.setParentId(5);
+        sheepSpecie.setTaxonRank("species");
+        sheepSpecie.setDescription("绵羊");
+        sheepSpecie.setLabelPath("/羊科/绵羊");
+        sheepSpecie.setCreateTime(LocalDateTime.parse("2024-01-01 00:00:00", dtf));
+        labels.add(sheepSpecie);
+
+        labelRepository.saveAll(labels);
+        System.out.println("创建了 " + labels.size() + " 个标签");
+    }
+
+    private void ensureAudioFiles() {
+        long existing = audioFileRepository.count();
+        if (existing >= 100) {
+            System.out.println("音频文件已足够(" + existing + "条)，跳过");
             return;
         }
-        
-        try {
-            Files.createDirectories(Paths.get(AUDIO_DIR));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
-        
-        SysUser admin = userRepository.findById(1).orElse(null);
-        if (admin == null) return;
-        
-        int[][] animalConfigs = {
-            {50, 100, 1500, 2},
-            {80, 150, 2000, 1},
-            {100, 200, 1500, 1},
-            {120, 150, 800, 2},
-            {150, 400, 1200, 3},
-            {400, 600, 1000, 6},
-            {600, 1200, 1500, 4},
-            {800, 1000, 1250, 7},
-            {3000, 1500, 150, 8},
-            {2500, 1000, 200, 5},
-            {800, 200, 400, 3},
-            {400, 100, 500, 4},
-            {600, 1500, 1000, 1},
-            {300, 50, 800, 3},
-            {4000, 500, 50, 40},
-            {200, 50, 20, 100},
-            {3000, 200, 100, 20},
-            {300, 200, 300, 6},
-            {150, 100, 500, 4},
-            {450, 50, 30, 80},
-        };
-        
-        String[] animalNames = {
-            "大象", "狮子", "老虎", "熊", "狼", "狗", "猫", "猴子",
-            "麻雀", "喜鹊", "乌鸦", "鸽子", "鹰", "猫头鹰",
-            "蝉", "蜜蜂", "蟋蟀", "青蛙", "蟾蜍", "蚊子"
-        };
-        
-        int[] labelIds = {55, 52, 51, 57, 54, 53, 50, 56,
-                          58, 59, 60, 61, 62, 63,
-                          64, 65, 66, 67, 68, 69};
-        
-        int[] datasetIds = {1, 1, 1, 1, 1, 1, 1, 1,
-                           2, 2, 2, 2, 2, 2,
-                           4, 4, 4, 5, 5, 4};
-        
+
         List<AudioFile> audioFiles = new ArrayList<>();
-        
-        for (int i = 0; i < animalConfigs.length; i++) {
-            String fileName = animalNames[i] + ".wav";
-            String filePath = AUDIO_DIR + "/" + fileName;
-            
-            byte[] wavData = generateWavData(
-                animalConfigs[i][0], 
-                animalConfigs[i][1], 
-                animalConfigs[i][2],
-                animalConfigs[i][3]
-            );
-            
-            try (FileOutputStream fos = new FileOutputStream(filePath)) {
-                fos.write(wavData);
-            } catch (IOException e) {
-                continue;
-            }
-            
-            AudioFile audioFile = new AudioFile();
-            audioFile.setDatasetId(datasetIds[i]);
-            audioFile.setFileName(fileName);
-            audioFile.setFilePath(filePath);
-            audioFile.setDuration(BigDecimal.valueOf(animalConfigs[i][3] * animalConfigs[i][2] / 1000.0 + 0.5));
-            audioFile.setSampleRate(16000);
-            audioFile.setChannels(1);
-            audioFile.setFileSize((long) wavData.length);
-            audioFile.setNoiseLevel("low");
-            audioFile.setLocation("人工合成");
-            audioFile.setUploadUserId(1);
-            audioFile.setRemark("合成" + animalNames[i] + "叫声");
-            
-            audioFiles.add(audioFile);
+        String[] noiseLevels = {"low", "medium", "high", "unknown"};
+        String[] locations = {"农场", "森林", "城市", "草原", "山区"};
+        String[] animalNames = {"dog", "cat", "sparrow", "eagle", "cow", "goat", "sheep", "wolf", "tiger"};
+        String[] animalLabels = {"狗", "猫", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
+
+        for (int i = 0; i < 100; i++) {
+            int animalIndex = i % animalNames.length;
+            int datasetId = (i / 20) + 1;
+            int locationIndex = i % locations.length;
+            int noiseIndex = i % noiseLevels.length;
+
+            AudioFile audio = new AudioFile();
+            audio.setDatasetId(datasetId);
+            audio.setFileName(animalNames[animalIndex] + "_" + String.format("%03d", i + 1) + ".wav");
+            audio.setFilePath("/uploads/dataset_" + datasetId + "/" + audio.getFileName());
+            audio.setDuration(BigDecimal.valueOf(2.0 + random.nextDouble() * 8.0).setScale(3, RoundingMode.HALF_UP));
+            audio.setSampleRate(44100);
+            audio.setChannels(1);
+            audio.setFileSize((long) (100000 + random.nextLong() * 900000));
+            audio.setNoiseLevel(noiseLevels[noiseIndex]);
+            audio.setLocation(locations[locationIndex]);
+            audio.setUploadUserId((i % 5) + 1);
+            audio.setUploadTime(LocalDateTime.parse("2024-03-" + String.format("%02d", ((i / 10) + 1)) + " " + String.format("%02d", (i % 24)) + ":00:00", dtf));
+            audio.setRemark(animalLabels[animalIndex] + "声音样本，环境噪声:" + noiseLevels[noiseIndex]);
+
+            audioFiles.add(audio);
         }
-        
+
         audioFileRepository.saveAll(audioFiles);
+        System.out.println("创建了 " + audioFiles.size() + " 个音频文件");
     }
-    
-    private byte[] generateWavData(int baseFreq, int variation, int durationMs, int repeats) {
-        try {
-            int sampleRate = 16000;
-            int bytesPerSample = 2;
-            int channels = 1;
-            int durationPerRepeat = durationMs * sampleRate / 1000;
-            int totalSamples = durationPerRepeat * repeats + sampleRate / 2;
-            
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            DataOutputStream dos = new DataOutputStream(baos);
-            
-            dos.writeBytes("RIFF");
-            dos.writeInt(36 + totalSamples * channels * bytesPerSample);
-            dos.writeBytes("WAVE");
-            dos.writeBytes("fmt ");
-            dos.writeInt(16);
-            dos.writeShort(1);
-            dos.writeShort(channels);
-            dos.writeInt(sampleRate);
-            dos.writeInt(sampleRate * channels * bytesPerSample);
-            dos.writeShort(channels * bytesPerSample);
-            dos.writeShort(8 * bytesPerSample);
-            dos.writeBytes("data");
-            dos.writeInt(totalSamples * channels * bytesPerSample);
-            
-            for (int r = 0; r < repeats; r++) {
-                for (int i = 0; i < durationPerRepeat; i++) {
-                    double t = (double) i / sampleRate;
-                    double freq = baseFreq + variation * Math.sin(2 * Math.PI * 5 * t);
-                    double envelope = Math.sin(Math.PI * t / (durationMs / 1000.0));
-                    double sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.3;
-                    
-                    short sampleInt = (short) (sample * 32767);
-                    dos.writeShort(sampleInt);
-                }
-                
-                for (int i = 0; i < sampleRate / 4; i++) {
-                    dos.writeShort((short) 0);
-                }
-            }
-            
-            return baos.toByteArray();
-        } catch (IOException e) {
-            return new byte[0];
+
+    private void ensureAnnotations() {
+        long existing = annotationRepository.count();
+        if (existing >= 100) {
+            System.out.println("标注记录已足够(" + existing + "条)，跳过");
+            return;
         }
+
+        List<AnnotationRecord> annotations = new ArrayList<>();
+        String[] soundTypes = {"bark", "meow", "chirp", "howl", "moo", "bleat", "roar", "purr", "squawk"};
+        String[] remarks = {
+            "清晰的叫声",
+            "带有背景噪声",
+            "声音较弱",
+            "声音洪亮",
+            "短促的叫声",
+            "连续的叫声",
+            "带有颤音",
+            "低沉的声音",
+            "尖锐的声音",
+            "混合声音"
+        };
+        String[] statuses = {"approved", "submitted", "rejected"};
+
+        List<AudioFile> audioFiles = audioFileRepository.findAll();
+        List<TaxonomyLabel> labels = labelRepository.findAll();
+
+        for (int i = 0; i < 100; i++) {
+            AudioFile audio = audioFiles.get(i % audioFiles.size());
+            int labelId = ((i % 9) + 6);
+            int annotatorId = ((i % 5) + 2);
+            Integer reviewerId = i % 3 == 0 ? 1 : null;
+            int statusIndex = i % 3;
+
+            AnnotationRecord annotation = new AnnotationRecord();
+            annotation.setAudioId(audio.getAudioId());
+            annotation.setAnnotatorId(annotatorId);
+            annotation.setStartTime(BigDecimal.ZERO);
+            annotation.setEndTime(audio.getDuration());
+            annotation.setLabelId(labelId);
+            annotation.setSoundType(soundTypes[i % soundTypes.length]);
+            annotation.setConfidence(70 + random.nextInt(31));
+            annotation.setRemark(remarks[i % remarks.length]);
+            annotation.setStatus(statuses[statusIndex]);
+            annotation.setReviewerId(reviewerId);
+            annotation.setReviewRemark(statusIndex == 0 ? "标注准确" : (statusIndex == 2 ? "标签错误" : null));
+            annotation.setCreateTime(LocalDateTime.parse("2024-04-" + String.format("%02d", ((i / 10) + 1)) + " " + String.format("%02d", (i % 24)) + ":30:00", dtf));
+            annotation.setUpdateTime(annotation.getCreateTime());
+
+            annotations.add(annotation);
+        }
+
+        annotationRepository.saveAll(annotations);
+        System.out.println("创建了 " + annotations.size() + " 条标注记录");
+    }
+
+    private void ensureTrainTasks() {
+        long existing = trainTaskRepository.count();
+        if (existing >= 5) {
+            System.out.println("训练任务已足够(" + existing + "条)，跳过");
+            return;
+        }
+
+        List<TrainTask> tasks = new ArrayList<>();
+
+        String[][] taskConfigs = {
+            {"CNN动物声纹分类模型", "1", "CNN", "{\"learningRate\":0.001,\"epochs\":50,\"batchSize\":32,\"trainValSplit\":0.8}"},
+            {"RNN时序声音识别模型", "1", "RNN", "{\"learningRate\":0.0005,\"epochs\":80,\"batchSize\":16,\"trainValSplit\":0.75}"},
+            {"Transformer注意力声音模型", "2", "Transformer", "{\"learningRate\":0.0001,\"epochs\":100,\"batchSize\":8,\"trainValSplit\":0.8}"},
+            {"CNN-LSTM混合模型", "3", "CNN-LSTM", "{\"learningRate\":0.001,\"epochs\":60,\"batchSize\":24,\"trainValSplit\":0.7}"},
+            {"ResNet深度声音分类", "4", "ResNet", "{\"learningRate\":0.0005,\"epochs\":120,\"batchSize\":16,\"trainValSplit\":0.85}"}
+        };
+
+        for (int i = 0; i < taskConfigs.length; i++) {
+            TrainTask task = new TrainTask();
+            task.setTaskName(taskConfigs[i][0]);
+            task.setDatasetId(Integer.parseInt(taskConfigs[i][1]));
+            task.setModelType(taskConfigs[i][2]);
+            task.setTrainParams(taskConfigs[i][3]);
+            task.setEnableHierarchicalLoss(1);
+            task.setStatus("completed");
+            task.setCreateUserId(1);
+            task.setModelSavePath("/models/task_" + (i + 1) + "/model.h5");
+            task.setBestModelPath("/models/task_" + (i + 1) + "/best_model.h5");
+            task.setCheckpointPath("/models/task_" + (i + 1) + "/checkpoint/");
+            task.setCreateTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 09:00:00", dtf));
+            task.setStartTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 09:30:00", dtf));
+            task.setEndTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 12:00:00", dtf));
+            task.setCurrentEpoch(50 + i * 10);
+            task.setBestValMetric(BigDecimal.valueOf(0.85 + i * 0.02).setScale(4, RoundingMode.HALF_UP));
+
+            tasks.add(task);
+        }
+
+        trainTaskRepository.saveAll(tasks);
+        System.out.println("创建了 " + tasks.size() + " 个训练任务");
+    }
+
+    private void ensureEvaluations() {
+        List<TrainTask> tasks = trainTaskRepository.findAll();
+        int neededCount = tasks.size();
+        long existing = modelEvaluationRepository.count();
+        
+        if (existing >= neededCount) {
+            System.out.println("模型评估记录已足够(" + existing + "条)，跳过");
+            return;
+        }
+
+        List<ModelEvaluation> evaluations = new ArrayList<>();
+        List<EvaluationResult> evalResults = new ArrayList<>();
+
+        double[][] evalMetrics = {
+            {0.85, 0.84, 0.86, 0.85, 0.82, 0.88},
+            {0.82, 0.81, 0.83, 0.82, 0.79, 0.85},
+            {0.91, 0.90, 0.92, 0.91, 0.88, 0.94},
+            {0.88, 0.87, 0.89, 0.88, 0.85, 0.91},
+            {0.93, 0.92, 0.94, 0.93, 0.90, 0.96}
+        };
+
+        String[] taxonRanks = {"family", "species"};
+
+        for (int i = 0; i < tasks.size(); i++) {
+            TrainTask task = tasks.get(i);
+            double[] metrics = evalMetrics[i % evalMetrics.length];
+
+            ModelEvaluation eval = new ModelEvaluation();
+            eval.setTaskId(task.getTaskId());
+            eval.setModelType(task.getModelType());
+            eval.setAccuracy(BigDecimal.valueOf(metrics[0]).setScale(4, RoundingMode.HALF_UP));
+            eval.setPrecision(BigDecimal.valueOf(metrics[1]).setScale(4, RoundingMode.HALF_UP));
+            eval.setRecall(BigDecimal.valueOf(metrics[2]).setScale(4, RoundingMode.HALF_UP));
+            eval.setF1Score(BigDecimal.valueOf(metrics[3]).setScale(4, RoundingMode.HALF_UP));
+            eval.setMacroF1(BigDecimal.valueOf(metrics[4]).setScale(4, RoundingMode.HALF_UP));
+            eval.setMicroF1(BigDecimal.valueOf(metrics[5]).setScale(4, RoundingMode.HALF_UP));
+            eval.setConfusionMatrix(generateConfusionMatrix(9));
+            eval.setClassificationReport(generateClassificationReport());
+            eval.setSampleCount(80);
+            eval.setClassCount(9);
+            eval.setCreateTime(task.getEndTime().plusMinutes(5));
+
+            evaluations.add(eval);
+
+            for (String rank : taxonRanks) {
+                EvaluationResult result = new EvaluationResult();
+                result.setTaskId(task.getTaskId());
+                result.setTaxonRank(rank);
+                double rankFactor = rank.equals("family") ? 1.05 : 0.95;
+                result.setAccuracy(BigDecimal.valueOf(metrics[0] * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setPrecisionValue(BigDecimal.valueOf(metrics[1] * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setRecall(BigDecimal.valueOf(metrics[2] * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setF1Score(BigDecimal.valueOf(metrics[3] * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setConfusionMatrixPath("/results/task_" + (i + 1) + "/confusion_matrix_" + rank + ".png");
+                result.setCreateTime(task.getEndTime().plusMinutes(5));
+
+                evalResults.add(result);
+            }
+        }
+
+        modelEvaluationRepository.saveAll(evaluations);
+        evaluationResultRepository.saveAll(evalResults);
+        System.out.println("创建了 " + evaluations.size() + " 个模型评估记录");
+        System.out.println("创建了 " + evalResults.size() + " 个分级评估结果");
+    }
+
+    private String generateConfusionMatrix(int size) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < size; i++) {
+            sb.append("[");
+            for (int j = 0; j < size; j++) {
+                int value = i == j ? 8 + random.nextInt(4) : random.nextInt(4);
+                sb.append(value);
+                if (j < size - 1) sb.append(",");
+            }
+            sb.append("]");
+            if (i < size - 1) sb.append(",");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private String generateClassificationReport() {
+        String[] classes = {"狗", "猫", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
+        StringBuilder sb = new StringBuilder("{");
+        for (int i = 0; i < classes.length; i++) {
+            sb.append("\"").append(classes[i]).append("\": {");
+            sb.append("\"precision\":").append(BigDecimal.valueOf(0.75 + random.nextDouble() * 0.2).setScale(4, RoundingMode.HALF_UP)).append(",");
+            sb.append("\"recall\":").append(BigDecimal.valueOf(0.75 + random.nextDouble() * 0.2).setScale(4, RoundingMode.HALF_UP)).append(",");
+            sb.append("\"f1-score\":").append(BigDecimal.valueOf(0.75 + random.nextDouble() * 0.2).setScale(4, RoundingMode.HALF_UP)).append(",");
+            sb.append("\"support\":").append(8 + random.nextInt(4));
+            sb.append("}");
+            if (i < classes.length - 1) sb.append(",");
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }
