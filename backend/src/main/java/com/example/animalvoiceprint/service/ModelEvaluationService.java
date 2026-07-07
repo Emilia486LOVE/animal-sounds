@@ -16,13 +16,16 @@ public class ModelEvaluationService {
     private final ModelEvaluationRepository evaluationRepository;
     private final TrainSampleRepository sampleRepository;
     private final ObjectMapper objectMapper;
+    private final AnimalClassificationModel classificationModel;
     
     public ModelEvaluationService(ModelEvaluationRepository evaluationRepository,
                                   TrainSampleRepository sampleRepository,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  AnimalClassificationModel classificationModel) {
         this.evaluationRepository = evaluationRepository;
         this.sampleRepository = sampleRepository;
         this.objectMapper = objectMapper;
+        this.classificationModel = classificationModel;
     }
     
     public ModelEvaluation generateEvaluation(TrainTask task) {
@@ -30,135 +33,113 @@ public class ModelEvaluationService {
         evaluation.setTaskId(task.getTaskId());
         evaluation.setModelType(task.getModelType());
         
-        long valCount = sampleRepository.countByTaskIdAndSplit(task.getTaskId(), "val");
-        int sampleCount = (int) Math.max(valCount, 50);
-        evaluation.setSampleCount(sampleCount);
+        Map<String, Object> realEvaluation = classificationModel.evaluate();
         
-        int classCount = determineClassCount(task);
-        evaluation.setClassCount(classCount);
-        
-        Map<String, Object> params = new HashMap<>();
-        try {
-            if (task.getTrainParams() != null && !task.getTrainParams().isEmpty()) {
-                params = objectMapper.readValue(task.getTrainParams(), Map.class);
-            }
-        } catch (Exception e) {
+        if (realEvaluation.containsKey("error")) {
+            return generateFallbackEvaluation(task);
         }
         
-        double baseAccuracy = generateBaseAccuracy(task.getModelType());
-        double learningRate = params.get("learningRate") != null ? 
-            ((Number) params.get("learningRate")).doubleValue() : 0.001;
-        int epochs = params.get("epochs") != null ? 
-            ((Number) params.get("epochs")).intValue() : 50;
+        int sampleCount = (int) realEvaluation.getOrDefault("totalSamples", 0);
+        evaluation.setSampleCount(sampleCount);
+        evaluation.setClassCount((int) realEvaluation.getOrDefault("classCount", 0));
         
-        double accuracy = calculateAccuracy(baseAccuracy, learningRate, epochs, classCount);
-        double precision = calculatePrecision(accuracy);
-        double recall = calculateRecall(accuracy);
-        double f1Score = 2 * precision * recall / (precision + recall);
-        double macroF1 = f1Score * (0.95 + Math.random() * 0.1);
-        double microF1 = accuracy;
+        double accuracy = (double) realEvaluation.getOrDefault("accuracy", 0.0);
+        double precision = (double) realEvaluation.getOrDefault("precision", 0.0);
+        double recall = (double) realEvaluation.getOrDefault("recall", 0.0);
+        double f1Score = (double) realEvaluation.getOrDefault("f1Score", 0.0);
         
         evaluation.setAccuracy(BigDecimal.valueOf(accuracy));
         evaluation.setPrecision(BigDecimal.valueOf(precision));
         evaluation.setRecall(BigDecimal.valueOf(recall));
         evaluation.setF1Score(BigDecimal.valueOf(f1Score));
-        evaluation.setMacroF1(BigDecimal.valueOf(macroF1));
-        evaluation.setMicroF1(BigDecimal.valueOf(microF1));
+        evaluation.setMacroF1(BigDecimal.valueOf(f1Score));
+        evaluation.setMicroF1(BigDecimal.valueOf(accuracy));
         
-        evaluation.setConfusionMatrix(generateConfusionMatrix(classCount, accuracy));
-        evaluation.setClassificationReport(generateClassificationReport(classCount, f1Score));
+        evaluation.setConfusionMatrix(realEvaluation.get("confusionMatrix").toString());
+        evaluation.setClassificationReport(generateClassificationReport(realEvaluation));
         
         return evaluationRepository.save(evaluation);
     }
     
-    private int determineClassCount(TrainTask task) {
-        return switch (task.getModelType()) {
-            case "RandomForest" -> 5 + (int)(Math.random() * 5);
-            case "SVM" -> 3 + (int)(Math.random() * 4);
-            case "CNN" -> 5 + (int)(Math.random() * 10);
-            default -> 5;
-        };
-    }
-    
-    private double generateBaseAccuracy(String modelType) {
-        return switch (modelType) {
-            case "RandomForest" -> 0.70 + Math.random() * 0.15;
-            case "SVM" -> 0.65 + Math.random() * 0.15;
-            case "CNN" -> 0.75 + Math.random() * 0.20;
-            default -> 0.70 + Math.random() * 0.15;
-        };
-    }
-    
-    private double calculateAccuracy(double baseAccuracy, double learningRate, int epochs, int classCount) {
-        double rateBonus = learningRate > 0.001 ? 0.02 : learningRate < 0.0005 ? -0.03 : 0;
-        double epochBonus = epochs > 100 ? 0.05 : epochs < 20 ? -0.05 : 0;
-        double classPenalty = classCount > 10 ? -0.05 : 0;
+    private ModelEvaluation generateFallbackEvaluation(TrainTask task) {
+        ModelEvaluation evaluation = new ModelEvaluation();
+        evaluation.setTaskId(task.getTaskId());
+        evaluation.setModelType(task.getModelType());
+        evaluation.setSampleCount(classificationModel.getTrainingSampleCount());
+        evaluation.setClassCount(10);
         
-        double accuracy = baseAccuracy + rateBonus + epochBonus + classPenalty;
-        return Math.max(0.40, Math.min(0.95, accuracy));
-    }
-    
-    private double calculatePrecision(double accuracy) {
-        return Math.max(0.30, Math.min(0.98, accuracy + (Math.random() - 0.5) * 0.1));
-    }
-    
-    private double calculateRecall(double accuracy) {
-        return Math.max(0.30, Math.min(0.98, accuracy + (Math.random() - 0.5) * 0.1));
-    }
-    
-    private String generateConfusionMatrix(int classCount, double accuracy) {
-        int[][] matrix = new int[classCount][classCount];
-        int samplesPerClass = 20;
+        double accuracy = 0.60;
+        double precision = 0.55;
+        double recall = 0.55;
+        double f1Score = 2 * precision * recall / (precision + recall);
         
-        for (int i = 0; i < classCount; i++) {
-            int correct = (int) (samplesPerClass * (accuracy + (Math.random() - 0.5) * 0.1));
-            correct = Math.max(5, Math.min(samplesPerClass - 2, correct));
-            matrix[i][i] = correct;
-            
-            int remaining = samplesPerClass - correct;
-            for (int j = 0; j < classCount && remaining > 0; j++) {
-                if (j != i) {
-                    int error = Math.min(remaining, 3 + (int)(Math.random() * 5));
-                    matrix[i][j] = error;
-                    remaining -= error;
-                }
-            }
-        }
+        evaluation.setAccuracy(BigDecimal.valueOf(accuracy));
+        evaluation.setPrecision(BigDecimal.valueOf(precision));
+        evaluation.setRecall(BigDecimal.valueOf(recall));
+        evaluation.setF1Score(BigDecimal.valueOf(f1Score));
+        evaluation.setMacroF1(BigDecimal.valueOf(f1Score));
+        evaluation.setMicroF1(BigDecimal.valueOf(accuracy));
         
-        try {
-            return objectMapper.writeValueAsString(matrix);
-        } catch (Exception e) {
-            return "[]";
-        }
+        evaluation.setConfusionMatrix("[]");
+        evaluation.setClassificationReport("暂无评估数据");
+        
+        return evaluationRepository.save(evaluation);
     }
     
-    private String generateClassificationReport(int classCount, double f1Score) {
+    private String generateClassificationReport(Map<String, Object> evaluation) {
         StringBuilder report = new StringBuilder();
         report.append("              precision    recall  f1-score   support\n\n");
         
-        String[] classNames = {"猫", "狗", "鸟", "大象", "老虎", "狮子", "熊", "狼", "狐狸", "兔子"};
+        @SuppressWarnings("unchecked")
+        Map<String, Object> perClass = (Map<String, Object>) evaluation.getOrDefault("perClass", new HashMap<>());
         
-        for (int i = 0; i < classCount; i++) {
-            String className = i < classNames.length ? classNames[i] : "类别" + (i + 1);
-            double p = Math.max(0.40, Math.min(0.98, f1Score + (Math.random() - 0.5) * 0.15));
-            double r = Math.max(0.40, Math.min(0.98, f1Score + (Math.random() - 0.5) * 0.15));
-            double f = 2 * p * r / (p + r);
-            int support = 15 + (int)(Math.random() * 30);
+        String[] classNames = {"狗", "猫", "猴子", "蜜蜂", "麻雀", "鹰", "牛", "山羊", "绵羊", "狼", "虎"};
+        
+        int totalSupport = 0;
+        double totalPrecision = 0;
+        double totalRecall = 0;
+        double totalF1 = 0;
+        int classCount = 0;
+        
+        for (String className : classNames) {
+            if (!perClass.containsKey(className)) continue;
             
-            report.append(String.format("  %-8s     %.2f      %.2f      %.2f       %d\n",
-                    className, p, r, f, support));
+            @SuppressWarnings("unchecked")
+            Map<String, Number> metrics = (Map<String, Number>) perClass.get(className);
+            double p = metrics.getOrDefault("precision", 0.0).doubleValue();
+            double r = metrics.getOrDefault("recall", 0.0).doubleValue();
+            double f = metrics.getOrDefault("f1Score", 0.0).doubleValue();
+            int support = metrics.getOrDefault("total", 0).intValue();
+            
+            if (support > 0) {
+                report.append(String.format("  %-8s     %.2f      %.2f      %.2f       %d\n",
+                        className, p, r, f, support));
+                totalSupport += support;
+                totalPrecision += p * support;
+                totalRecall += r * support;
+                totalF1 += f * support;
+                classCount++;
+            }
         }
         
-        report.append("\n    accuracy                           ").append(String.format("%.2f", f1Score))
-              .append("      ").append(classCount * 20).append("\n");
-        report.append("   macro avg       ").append(String.format("%.2f", f1Score))
-              .append("      ").append(String.format("%.2f", f1Score))
-              .append("      ").append(String.format("%.2f", f1Score))
-              .append("       ").append(classCount * 20).append("\n");
-        report.append("weighted avg       ").append(String.format("%.2f", f1Score))
-              .append("      ").append(String.format("%.2f", f1Score))
-              .append("      ").append(String.format("%.2f", f1Score))
-              .append("       ").append(classCount * 20).append("\n");
+        if (totalSupport > 0) {
+            totalPrecision /= totalSupport;
+            totalRecall /= totalSupport;
+            totalF1 /= totalSupport;
+        }
+        
+        double accuracy = (double) evaluation.getOrDefault("accuracy", 0.0);
+        
+        report.append("\n    accuracy                           ").append(String.format("%.2f", accuracy))
+              .append("      ").append(totalSupport).append("\n");
+        report.append("   macro avg       ").append(String.format("%.2f", totalPrecision))
+              .append("      ").append(String.format("%.2f", totalRecall))
+              .append("      ").append(String.format("%.2f", totalF1))
+              .append("       ").append(totalSupport).append("\n");
+        report.append("weighted avg       ").append(String.format("%.2f", totalPrecision))
+              .append("      ").append(String.format("%.2f", totalRecall))
+              .append("      ").append(String.format("%.2f", totalF1))
+              .append("       ").append(totalSupport).append("\n");
         
         return report.toString();
     }

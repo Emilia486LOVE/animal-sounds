@@ -85,9 +85,7 @@
         </el-form-item>
         <el-form-item label="模型类型" prop="modelType">
           <el-select v-model="form.modelType" placeholder="选择模型类型">
-            <el-option label="随机森林" value="RandomForest" />
-            <el-option label="支持向量机" value="SVM" />
-            <el-option label="卷积神经网络" value="CNN" />
+            <el-option label="KNN动物声纹分类模型" value="KNN" />
           </el-select>
         </el-form-item>
         <el-form-item label="启用层级损失" prop="enableHierarchicalLoss">
