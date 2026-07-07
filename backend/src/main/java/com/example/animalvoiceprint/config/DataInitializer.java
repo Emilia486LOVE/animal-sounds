@@ -385,7 +385,7 @@ public class DataInitializer implements CommandLineRunner {
             task.setModelType(taskConfigs[i][2]);
             task.setTrainParams(taskConfigs[i][3]);
             task.setEnableHierarchicalLoss(1);
-            task.setStatus("completed");
+            task.setStatus("success");
             task.setCreateUserId(1);
             task.setModelSavePath("/models/task_" + (i + 1) + "/model.h5");
             task.setBestModelPath("/models/task_" + (i + 1) + "/best_model.h5");

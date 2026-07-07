@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/evaluation")
-@PreAuthorize("hasAnyRole('admin', 'algorithm')")
 public class EvaluationController {
     
     private final EvaluationService evaluationService;
