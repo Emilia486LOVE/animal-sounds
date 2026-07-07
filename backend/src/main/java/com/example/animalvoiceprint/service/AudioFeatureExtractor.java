@@ -19,12 +19,13 @@ public class AudioFeatureExtractor {
     private static final int BUFFER_SIZE = 512;
     private static final int MFCC_COEFFICIENTS = 13;
     private static final int MEL_FILTERS = 26;
+    private static final int FRAME_SHIFT = 256;
 
     double[] featureMean = null;
     double[] featureStd = null;
     boolean featuresNormalized = false;
 
-    public double[] extractMFCC(String audioFilePath) {
+    public double[] extractFeatures(String audioFilePath) {
         File audioFile = new File(audioFilePath);
         if (!audioFile.exists()) {
             logger.error("音频文件不存在: {}", audioFilePath);
@@ -39,24 +40,33 @@ public class AudioFeatureExtractor {
             int channels = format.getChannels();
             int bytesPerSample = format.getSampleSizeInBits() / 8;
 
+            List<Double> allSamples = new ArrayList<>();
             byte[] buffer = new byte[BUFFER_SIZE * channels * bytesPerSample];
             int bytesRead;
 
             while ((bytesRead = audioInputStream.read(buffer)) != -1) {
                 double[] samples = convertToMono(buffer, bytesRead, format);
-                
                 if (sampleRate != SAMPLE_RATE) {
                     samples = resample(samples, sampleRate, SAMPLE_RATE);
                 }
+                for (double s : samples) {
+                    allSamples.add(s);
+                }
+            }
 
-                double[] mfccValues = computeMFCC(samples);
+            double[] sampleArray = allSamples.stream().mapToDouble(Double::doubleValue).toArray();
+
+            for (int i = 0; i + BUFFER_SIZE <= sampleArray.length; i += FRAME_SHIFT) {
+                double[] frame = new double[BUFFER_SIZE];
+                System.arraycopy(sampleArray, i, frame, 0, BUFFER_SIZE);
+                double[] mfccValues = computeMFCC(frame);
                 if (mfccValues != null && mfccValues.length > 0) {
                     mfccFrames.add(mfccValues);
                 }
             }
 
         } catch (UnsupportedAudioFileException | IOException e) {
-            logger.error("提取MFCC特征失败: {}", e.getMessage(), e);
+            logger.error("提取特征失败: {}", e.getMessage(), e);
             return null;
         }
 
@@ -65,7 +75,146 @@ public class AudioFeatureExtractor {
             return null;
         }
 
-        return computeMeanMFCC(mfccFrames);
+        return extractCombinedFeatures(mfccFrames);
+    }
+
+    private double[] extractCombinedFeatures(List<double[]> mfccFrames) {
+        int numFrames = mfccFrames.size();
+        int numCoeffs = mfccFrames.get(0).length;
+
+        double[] mean = new double[numCoeffs];
+        double[] variance = new double[numCoeffs];
+        double[] std = new double[numCoeffs];
+        double[] min = new double[numCoeffs];
+        double[] max = new double[numCoeffs];
+        double[] median = new double[numCoeffs];
+        double[] skewness = new double[numCoeffs];
+        double[] kurtosis = new double[numCoeffs];
+
+        for (int i = 0; i < numCoeffs; i++) {
+            min[i] = Double.MAX_VALUE;
+            max[i] = Double.MIN_VALUE;
+        }
+
+        for (double[] frame : mfccFrames) {
+            for (int i = 0; i < numCoeffs; i++) {
+                mean[i] += frame[i];
+                if (frame[i] < min[i]) min[i] = frame[i];
+                if (frame[i] > max[i]) max[i] = frame[i];
+            }
+        }
+
+        for (int i = 0; i < numCoeffs; i++) {
+            mean[i] /= numFrames;
+        }
+
+        for (double[] frame : mfccFrames) {
+            for (int i = 0; i < numCoeffs; i++) {
+                double diff = frame[i] - mean[i];
+                variance[i] += diff * diff;
+            }
+        }
+
+        for (int i = 0; i < numCoeffs; i++) {
+            variance[i] /= numFrames;
+            std[i] = Math.sqrt(variance[i]);
+        }
+
+        for (int i = 0; i < numCoeffs; i++) {
+            double[] sorted = new double[numFrames];
+            for (int j = 0; j < numFrames; j++) {
+                sorted[j] = mfccFrames.get(j)[i];
+            }
+            java.util.Arrays.sort(sorted);
+            if (numFrames % 2 == 0) {
+                median[i] = (sorted[numFrames / 2 - 1] + sorted[numFrames / 2]) / 2.0;
+            } else {
+                median[i] = sorted[numFrames / 2];
+            }
+        }
+
+        for (double[] frame : mfccFrames) {
+            for (int i = 0; i < numCoeffs; i++) {
+                double diff = frame[i] - mean[i];
+                double stdVal = std[i] > 1e-10 ? std[i] : 1;
+                skewness[i] += Math.pow(diff / stdVal, 3);
+                kurtosis[i] += Math.pow(diff / stdVal, 4);
+            }
+        }
+
+        for (int i = 0; i < numCoeffs; i++) {
+            skewness[i] /= numFrames;
+            kurtosis[i] /= numFrames;
+        }
+
+        double[] zcr = computeZCR(mfccFrames);
+        double[] spectralCentroid = computeSpectralCentroid(mfccFrames);
+
+        int totalFeatures = numCoeffs * 8 + zcr.length + spectralCentroid.length;
+        double[] result = new double[totalFeatures];
+        int idx = 0;
+
+        for (double v : mean) result[idx++] = v;
+        for (double v : variance) result[idx++] = v;
+        for (double v : std) result[idx++] = v;
+        for (double v : min) result[idx++] = v;
+        for (double v : max) result[idx++] = v;
+        for (double v : median) result[idx++] = v;
+        for (double v : skewness) result[idx++] = v;
+        for (double v : kurtosis) result[idx++] = v;
+        for (double v : zcr) result[idx++] = v;
+        for (double v : spectralCentroid) result[idx++] = v;
+
+        return result;
+    }
+
+    private double[] computeZCR(List<double[]> mfccFrames) {
+        double[] zcr = new double[mfccFrames.get(0).length];
+        for (int i = 0; i < mfccFrames.get(0).length; i++) {
+            int crossings = 0;
+            for (int j = 1; j < mfccFrames.size(); j++) {
+                if (mfccFrames.get(j - 1)[i] * mfccFrames.get(j)[i] < 0) {
+                    crossings++;
+                }
+            }
+            zcr[i] = (double) crossings / (mfccFrames.size() - 1);
+        }
+        return zcr;
+    }
+
+    private double[] computeSpectralCentroid(List<double[]> mfccFrames) {
+        double[] centroid = new double[mfccFrames.size()];
+        for (int i = 0; i < mfccFrames.size(); i++) {
+            double[] frame = mfccFrames.get(i);
+            double sum = 0;
+            double weightedSum = 0;
+            for (int j = 0; j < frame.length; j++) {
+                sum += Math.abs(frame[j]);
+                weightedSum += j * Math.abs(frame[j]);
+            }
+            centroid[i] = sum > 1e-10 ? weightedSum / sum : 0;
+        }
+
+        double[] result = new double[3];
+        double meanCentroid = 0;
+        double varCentroid = 0;
+        for (double c : centroid) {
+            meanCentroid += c;
+        }
+        meanCentroid /= centroid.length;
+        for (double c : centroid) {
+            varCentroid += Math.pow(c - meanCentroid, 2);
+        }
+        varCentroid /= centroid.length;
+
+        result[0] = meanCentroid;
+        result[1] = varCentroid;
+        result[2] = Math.sqrt(varCentroid);
+        return result;
+    }
+
+    public double[] extractMFCC(String audioFilePath) {
+        return extractFeatures(audioFilePath);
     }
 
     private double[] convertToMono(byte[] buffer, int bytesRead, AudioFormat format) {
@@ -304,23 +453,6 @@ public class AudioFeatureExtractor {
         return matrix;
     }
 
-    private double[] computeMeanMFCC(List<double[]> frames) {
-        double[] mean = new double[MFCC_COEFFICIENTS];
-        int frameCount = frames.size();
-
-        for (double[] frame : frames) {
-            for (int i = 0; i < MFCC_COEFFICIENTS && i < frame.length; i++) {
-                mean[i] += frame[i];
-            }
-        }
-
-        for (int i = 0; i < MFCC_COEFFICIENTS; i++) {
-            mean[i] /= frameCount;
-        }
-
-        return mean;
-    }
-
     public void fitNormalization(List<double[]> featuresList) {
         if (featuresList == null || featuresList.isEmpty()) {
             featuresNormalized = false;
@@ -371,15 +503,7 @@ public class AudioFeatureExtractor {
     }
 
     public double[] extractCombinedFeatures(String audioFilePath) {
-        double[] mfcc = extractMFCC(audioFilePath);
-        if (mfcc == null) {
-            return null;
-        }
-
-        if (featuresNormalized) {
-            return normalize(mfcc);
-        }
-        return mfcc;
+        return extractFeatures(audioFilePath);
     }
 
     public double computeEuclideanDistance(double[] features1, double[] features2) {

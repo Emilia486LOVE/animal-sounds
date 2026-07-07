@@ -274,12 +274,15 @@ public class AnimalClassificationModel {
     private double calculateConfidence(int count, double avgDistance, double minDistance, int k) {
         double voteScore = (double) count / k;
         
-        double distanceScore = Math.max(0, 1 - avgDistance / maxDistance);
-        double minDistanceScore = Math.max(0, 1 - minDistance / (maxDistance / 2));
+        double normalizedAvgDist = Math.min(avgDistance / maxDistance, 1.0);
+        double normalizedMinDist = Math.min(minDistance / maxDistance, 1.0);
         
-        double confidence = 0.5 * voteScore + 0.3 * distanceScore + 0.2 * minDistanceScore;
+        double distanceScore = Math.exp(-normalizedAvgDist * 4);
+        double minDistanceScore = Math.exp(-normalizedMinDist * 6);
         
-        return Math.max(0.01, Math.min(1.0, confidence));
+        double confidence = 0.4 * voteScore + 0.35 * distanceScore + 0.25 * minDistanceScore;
+        
+        return Math.max(0.3, Math.min(0.99, confidence));
     }
 
     public Map<String, Object> evaluate() {
