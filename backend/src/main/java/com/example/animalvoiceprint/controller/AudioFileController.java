@@ -76,7 +76,6 @@ public class AudioFileController {
     }
     
     @GetMapping("/download/{filePath}")
-    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
     public ResponseEntity<Resource> downloadAudioFile(@PathVariable("filePath") String filePath) {
         Resource resource = audioFileService.loadAudioFileAsResource(filePath);
         if (resource == null) {

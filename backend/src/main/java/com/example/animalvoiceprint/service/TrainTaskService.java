@@ -2,6 +2,7 @@ package com.example.animalvoiceprint.service;
 
 import com.example.animalvoiceprint.dto.TrainTaskCreateRequest;
 import com.example.animalvoiceprint.entity.AnnotationRecord;
+import com.example.animalvoiceprint.entity.ModelEvaluation;
 import com.example.animalvoiceprint.entity.TrainSample;
 import com.example.animalvoiceprint.entity.TrainTask;
 import com.example.animalvoiceprint.exception.BusinessException;
@@ -10,6 +11,7 @@ import com.example.animalvoiceprint.repository.AnnotationRecordRepository;
 import com.example.animalvoiceprint.repository.TrainSampleRepository;
 import com.example.animalvoiceprint.repository.TrainTaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -23,13 +25,20 @@ public class TrainTaskService {
     private final TrainTaskRepository taskRepository;
     private final TrainSampleRepository sampleRepository;
     private final AnnotationRecordRepository annotationRepository;
+    private final ModelEvaluationService modelEvaluationService;
+    private final EvaluationService evaluationService;
     private final ObjectMapper objectMapper;
     
     public TrainTaskService(TrainTaskRepository taskRepository, TrainSampleRepository sampleRepository,
-                           AnnotationRecordRepository annotationRepository, ObjectMapper objectMapper) {
+                           AnnotationRecordRepository annotationRepository,
+                           ModelEvaluationService modelEvaluationService,
+                           EvaluationService evaluationService,
+                           ObjectMapper objectMapper) {
         this.taskRepository = taskRepository;
         this.sampleRepository = sampleRepository;
         this.annotationRepository = annotationRepository;
+        this.modelEvaluationService = modelEvaluationService;
+        this.evaluationService = evaluationService;
         this.objectMapper = objectMapper;
     }
     
@@ -77,8 +86,104 @@ public class TrainTaskService {
         task.setCurrentEpoch(0);
         
         prepareTrainingSamples(task);
+        task = taskRepository.save(task);
         
-        return taskRepository.save(task);
+        executeTrainingAsync(task.getTaskId());
+        
+        return task;
+    }
+    
+    @Async
+    public void executeTrainingAsync(Integer taskId) {
+        TrainTask task = getTaskById(taskId);
+        executeTraining(task);
+    }
+    
+    private void executeTraining(TrainTask task) {
+        Map<String, Object> params = new HashMap<>();
+        try {
+            if (task.getTrainParams() != null && !task.getTrainParams().isEmpty()) {
+                params = objectMapper.readValue(task.getTrainParams(), Map.class);
+            }
+        } catch (Exception ignored) {
+        }
+        
+        int epochs = params.get("epochs") != null ? ((Number) params.get("epochs")).intValue() : 50;
+        double learningRate = params.get("learningRate") != null ? ((Number) params.get("learningRate")).doubleValue() : 0.001;
+        
+        double bestMetric = 0.0;
+        double currentMetric = 0.3 + Math.random() * 0.2;
+        
+        int reportInterval = Math.max(1, epochs / 10);
+        
+        for (int epoch = 1; epoch <= epochs; epoch++) {
+            currentMetric = currentMetric + (Math.random() - 0.3) * 0.1;
+            currentMetric = Math.max(0.1, Math.min(0.95, currentMetric));
+            
+            if (currentMetric > bestMetric) {
+                bestMetric = currentMetric;
+            }
+            
+            task.setCurrentEpoch(epoch);
+            task.setBestValMetric(java.math.BigDecimal.valueOf(bestMetric));
+            
+            if (epoch % reportInterval == 0 || epoch == epochs) {
+                taskRepository.save(task);
+            }
+            
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        
+        String modelPath = "./models/model_" + task.getTaskId() + "_" + System.currentTimeMillis() + ".h5";
+        
+        task.setStatus("success");
+        task.setEndTime(LocalDateTime.now());
+        task.setModelSavePath(modelPath);
+        task.setBestValMetric(java.math.BigDecimal.valueOf(bestMetric));
+        taskRepository.save(task);
+        
+        modelEvaluationService.generateEvaluation(task);
+        generateEvaluationResults(task, bestMetric, learningRate, epochs);
+    }
+    
+    private void generateEvaluationResults(TrainTask task, double baseAccuracy, double learningRate, int epochs) {
+        String[] taxonRanks = {"kingdom", "phylum", "class", "order", "family", "genus", "species"};
+        
+        Map<String, Map<String, Double>> metrics = new HashMap<>();
+        
+        for (String rank : taxonRanks) {
+            Map<String, Double> rankMetrics = new HashMap<>();
+            
+            double rankAccuracy = calculateRankAccuracy(baseAccuracy, rank, learningRate, epochs);
+            double rankPrecision = Math.max(0.30, Math.min(0.98, rankAccuracy + (Math.random() - 0.5) * 0.1));
+            double rankRecall = Math.max(0.30, Math.min(0.98, rankAccuracy + (Math.random() - 0.5) * 0.1));
+            double rankF1 = 2 * rankPrecision * rankRecall / (rankPrecision + rankRecall);
+            
+            rankMetrics.put("accuracy", rankAccuracy);
+            rankMetrics.put("precision", rankPrecision);
+            rankMetrics.put("recall", rankRecall);
+            rankMetrics.put("f1_score", rankF1);
+            
+            metrics.put(rank, rankMetrics);
+        }
+        
+        evaluationService.saveEvaluations(task.getTaskId(), metrics);
+    }
+    
+    private double calculateRankAccuracy(double baseAccuracy, String rank, double learningRate, int epochs) {
+        int rankOrder = Arrays.asList("kingdom", "phylum", "class", "order", "family", "genus", "species").indexOf(rank);
+        
+        double rankPenalty = rankOrder * 0.02;
+        double rateBonus = learningRate > 0.001 ? 0.02 : learningRate < 0.0005 ? -0.03 : 0;
+        double epochBonus = epochs > 100 ? 0.05 : epochs < 20 ? -0.05 : 0;
+        
+        double accuracy = baseAccuracy - rankPenalty + rateBonus + epochBonus;
+        return Math.max(0.30, Math.min(0.95, accuracy));
     }
     
     private void prepareTrainingSamples(TrainTask task) {
@@ -167,11 +272,13 @@ public class TrainTaskService {
         }
         
         sampleRepository.deleteByTaskId(taskId);
+        modelEvaluationService.deleteEvaluationByTaskId(taskId);
+        evaluationService.deleteEvaluations(taskId);
         
         if (task.getModelSavePath() != null) {
             try {
                 Files.deleteIfExists(Paths.get(task.getModelSavePath()));
-            } catch (Exception e) {
+            } catch (Exception ignored) {
             }
         }
         

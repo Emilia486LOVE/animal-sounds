@@ -161,13 +161,6 @@ const roleOptions = [
   { value: 'guest', label: '访客' }
 ]
 
-const roleColors = {
-  admin: 'danger',
-  annotator: 'primary',
-  algorithm: 'warning',
-  guest: 'info'
-}
-
 const loadUsers = async () => {
   loading.value = true
   try {

@@ -65,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllDatasets, createDataset, updateDataset, deleteDataset } from '../api/dataset'
 import dayjs from 'dayjs'
@@ -118,11 +118,13 @@ const handleAdd = () => {
   modalVisible.value = true
 }
 
-const handleEdit = (record) => {
+const handleEdit = async (record) => {
   isEdit.value = true
   editingId.value = record.datasetId
+  await nextTick()
   form.datasetName = record.datasetName
   form.description = record.description || ''
+  await nextTick()
   modalVisible.value = true
 }
 

@@ -70,7 +70,7 @@
           <template #default="scope">
             <el-button type="text" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button v-if="scope.row.status === 'draft'" type="text" @click="handleSubmit(scope.row.annotationId)">提交审核</el-button>
-            <el-button v-if="scope.row.status === 'submitted'" type="text" @click="handleReview(scope.row)">审核</el-button>
+            <el-button v-if="scope.row.status === 'submitted'" type="text" @click="handleReview(scope.row.annotationId)">审核</el-button>
             <el-button type="text" @click="handleDelete(scope.row.annotationId)" style="color: #F53F3F">删除</el-button>
           </template>
         </el-table-column>
@@ -379,13 +379,22 @@ const handleSubmit = async () => {
   }
 }
 
-const handleReview = async (id, approved) => {
+const handleReview = async (id) => {
   try {
-    await reviewAnnotation(id, approved)
-    ElMessage.success(approved ? '审核通过' : '审核拒绝')
+    await ElMessageBox.confirm('确定审核通过？', '审核确认', {
+      confirmButtonText: '通过',
+      cancelButtonText: '拒绝',
+      type: 'warning'
+    })
+    await reviewAnnotation(id, true)
+    ElMessage.success('审核通过')
     loadAnnotations()
   } catch (err) {
-    ElMessage.error(err.response?.data?.message || '审核失败')
+    if (err !== 'cancel') {
+      await reviewAnnotation(id, false)
+      ElMessage.success('审核拒绝')
+      loadAnnotations()
+    }
   }
 }
 

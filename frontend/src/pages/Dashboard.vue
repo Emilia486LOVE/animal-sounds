@@ -160,6 +160,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
 import { getOverview } from '../api/statistics'
 import { getAllTasks } from '../api/train'
 import { getAllDatasets } from '../api/dataset'
@@ -168,9 +169,9 @@ import {
 } from '@element-plus/icons-vue'
 
 const stats = ref({})
-const loading = ref(false)
 const tasks = ref([])
 const datasets = ref([])
+const loading = ref(false)
 const annotationChartRef = ref(null)
 const trainingChartRef = ref(null)
 

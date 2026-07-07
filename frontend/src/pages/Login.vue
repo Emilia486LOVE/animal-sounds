@@ -1,58 +1,15 @@
 <template>
-  <div
-    style="
-      minHeight: '100vh';
-      display: 'flex';
-      alignItems: 'center';
-      justifyContent: 'center';
-      backgroundColor: '#121826';
-      backgroundImage: `
-        linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px)
-      `;
-      backgroundSize: '20px 20px';
-    "
-  >
-    <el-card
-      style="
-        width: 420px;
-        backgroundColor: '#1A2233';
-        border: '1px solid #2A3344';
-        borderRadius: 12;
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)';
-      "
-    >
+  <div class="login-container">
+    <el-card class="login-card">
       <template #header>
-        <div style="textAlign: 'center'">
-          <div
-            style="
-              width: 64px;
-              height: 64px;
-              backgroundColor: '#165DFF';
-              borderRadius: 16;
-              display: 'flex';
-              alignItems: 'center';
-              justifyContent: 'center';
-              margin: '0 auto 16px';
-            "
-          >
-            <el-icon :size="32" style="color: '#fff'">
-            <Mic />
-          </el-icon>
+        <div class="login-header">
+          <div class="login-icon">
+            <el-icon :size="32" class="login-icon-inner">
+              <Mic />
+            </el-icon>
           </div>
-          <h1
-            style="
-              fontSize: 24;
-              fontWeight: 600;
-              color: '#E5E6EB';
-              marginBottom: 8;
-            "
-          >
-            动物声纹系统
-          </h1>
-          <p style="fontSize: 14; color: '#86909C'">
-            数据标注与多级分类训练平台
-          </p>
+          <h1 class="login-title">动物声纹系统</h1>
+          <p class="login-subtitle">数据标注与多级分类训练平台</p>
         </div>
       </template>
 
@@ -87,7 +44,7 @@
             type="primary"
             :loading="loading"
             size="large"
-            style="width: '100%'; height: 44"
+            class="login-btn"
             @click="handleLogin"
           >
             登录
@@ -95,13 +52,11 @@
         </el-form-item>
       </el-form>
 
-      <div style="textAlign: 'center'; marginTop: 20">
-        <p style="fontSize: 12; color: '#646D7A'; marginBottom: 8">
-          默认账号：admin / password
-        </p>
-        <p style="fontSize: 12; color: '#646D7A'">
+      <div class="login-footer">
+        <p class="login-hint">默认账号：admin / password</p>
+        <p class="login-register">
           还没有账号？
-          <a href="/register" style="color: '#165DFF'">立即注册</a>
+          <a href="/register" class="login-register-link">立即注册</a>
         </p>
       </div>
     </el-card>
@@ -145,3 +100,113 @@ const handleLogin = async () => {
   }
 }
 </script>
+
+<style scoped>
+.login-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-global);
+  background-image: 
+    linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px);
+  background-size: 20px 20px;
+  padding: 16px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--color-bg-module);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.login-header {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.login-icon {
+  width: 64px;
+  height: 64px;
+  background-color: var(--color-brand-primary);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.login-icon-inner {
+  color: #fff;
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.login-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.login-btn {
+  width: 100%;
+  height: 44px;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.login-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.login-register {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.login-register-link {
+  color: var(--color-brand-primary);
+  text-decoration: none;
+}
+
+.login-register-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+  }
+  
+  .login-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+  
+  .login-title {
+    font-size: 20px;
+  }
+}
+
+@media (min-height: 800px) {
+  .login-container {
+    padding: 40px 16px;
+  }
+}
+</style>

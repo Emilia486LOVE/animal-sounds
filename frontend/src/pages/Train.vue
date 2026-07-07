@@ -58,10 +58,11 @@
             {{ scope.row.endTime ? dayjs(scope.row.endTime).format('YYYY-MM-DD HH:mm') : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button v-if="scope.row.status === 'pending'" type="text" @click="handleStart(scope.row.taskId)">启动</el-button>
             <el-button v-if="scope.row.status === 'running'" type="text" loading>训练中</el-button>
+            <el-button v-if="scope.row.status === 'success'" type="text" @click="handleViewEvaluation(scope.row.taskId)">查看评估</el-button>
             <el-button v-if="scope.row.status !== 'running'" type="text" @click="handleDelete(scope.row.taskId)" style="color: #F53F3F">删除</el-button>
           </template>
         </el-table-column>
@@ -95,8 +96,17 @@
             <el-option label="禁用" :value="false" />
           </el-select>
         </el-form-item>
-        <el-form-item label="训练参数" prop="trainParams">
-          <el-input v-model="form.trainParams" type="textarea" :rows="3" placeholder='{"n_estimators": 100, "max_depth": 10}' />
+        <el-form-item label="学习率" prop="learningRate">
+          <el-input-number v-model="form.learningRate" :min="0.0001" :max="0.1" :step="0.001" placeholder="0.001" />
+          <span style="margin-left: 8px; color: #86909C; font-size: 12px">控制模型学习速度，过小收敛慢，过大不稳定</span>
+        </el-form-item>
+        <el-form-item label="批处理大小" prop="batchSize">
+          <el-input-number v-model="form.batchSize" :min="1" :max="512" :step="8" placeholder="32" />
+          <span style="margin-left: 8px; color: #86909C; font-size: 12px">每次训练处理的样本数，越大训练越快但内存消耗越多</span>
+        </el-form-item>
+        <el-form-item label="训练轮数" prop="epochs">
+          <el-input-number v-model="form.epochs" :min="1" :max="1000" :step="10" placeholder="50" />
+          <span style="margin-left: 8px; color: #86909C; font-size: 12px">模型训练的总轮数，越多可能效果越好但过拟合风险增加</span>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" native-type="submit" @click="handleSubmit">提交</el-button>
@@ -104,13 +114,71 @@
         </el-form-item>
       </el-form>
     </el-dialog>
+
+    <el-dialog
+      title="模型评估结果"
+      v-model="evaluationVisible"
+      width="800px"
+    >
+      <div v-if="evaluation" class="evaluation-content">
+        <div class="evaluation-cards">
+          <div class="eval-card">
+            <div class="eval-label">准确率 (Accuracy)</div>
+            <div class="eval-value">{{ (evaluation.accuracy * 100).toFixed(2) }}%</div>
+          </div>
+          <div class="eval-card">
+            <div class="eval-label">精确率 (Precision)</div>
+            <div class="eval-value">{{ (evaluation.precision * 100).toFixed(2) }}%</div>
+          </div>
+          <div class="eval-card">
+            <div class="eval-label">召回率 (Recall)</div>
+            <div class="eval-value">{{ (evaluation.recall * 100).toFixed(2) }}%</div>
+          </div>
+          <div class="eval-card">
+            <div class="eval-label">F1分数 (F1-Score)</div>
+            <div class="eval-value">{{ (evaluation.f1Score * 100).toFixed(2) }}%</div>
+          </div>
+          <div class="eval-card">
+            <div class="eval-label">宏平均F1 (Macro-F1)</div>
+            <div class="eval-value">{{ (evaluation.macroF1 * 100).toFixed(2) }}%</div>
+          </div>
+          <div class="eval-card">
+            <div class="eval-label">微平均F1 (Micro-F1)</div>
+            <div class="eval-value">{{ (evaluation.microF1 * 100).toFixed(2) }}%</div>
+          </div>
+        </div>
+        
+        <div class="evaluation-info">
+          <div class="info-row">
+            <span class="info-label">模型类型:</span>
+            <span class="info-value">{{ evaluation.modelType }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">评估样本数:</span>
+            <span class="info-value">{{ evaluation.sampleCount }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">类别数量:</span>
+            <span class="info-value">{{ evaluation.classCount }}</span>
+          </div>
+        </div>
+
+        <div v-if="evaluation.classificationReport" class="report-section">
+          <h3>分类报告</h3>
+          <pre class="report-pre">{{ evaluation.classificationReport }}</pre>
+        </div>
+      </div>
+      <div v-else>
+        <el-empty description="暂无评估数据" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAllTasks, createTask, startTask, deleteTask } from '../api/train'
+import { getAllTasks, createTask, startTask, deleteTask, getEvaluationByTaskId } from '../api/train'
 import { getAllDatasets } from '../api/dataset'
 import dayjs from 'dayjs'
 
@@ -118,6 +186,8 @@ const tasks = ref([])
 const loading = ref(false)
 const datasets = ref([])
 const modalVisible = ref(false)
+const evaluationVisible = ref(false)
+const evaluation = ref(null)
 const formRef = ref(null)
 let intervalId = null
 
@@ -126,7 +196,9 @@ const form = reactive({
   datasetId: '',
   modelType: '',
   enableHierarchicalLoss: false,
-  trainParams: ''
+  learningRate: 0.001,
+  batchSize: 32,
+  epochs: 50
 })
 
 const rules = {
@@ -162,7 +234,9 @@ const handleAdd = () => {
   form.datasetId = ''
   form.modelType = ''
   form.enableHierarchicalLoss = false
-  form.trainParams = ''
+  form.learningRate = 0.001
+  form.batchSize = 32
+  form.epochs = 50
   modalVisible.value = true
 }
 
@@ -170,8 +244,20 @@ const handleSubmit = async () => {
   const valid = await formRef.value.validate()
   if (!valid) return
 
+  const requestData = {
+    taskName: form.taskName,
+    datasetId: form.datasetId,
+    modelType: form.modelType,
+    enableHierarchicalLoss: form.enableHierarchicalLoss ? 1 : 0,
+    trainParams: {
+      learningRate: form.learningRate,
+      batchSize: form.batchSize,
+      epochs: form.epochs
+    }
+  }
+
   try {
-    await createTask(form)
+    await createTask(requestData)
     ElMessage.success('训练任务创建成功')
     modalVisible.value = false
     loadTasks()
@@ -187,6 +273,21 @@ const handleStart = async (id) => {
     loadTasks()
   } catch (err) {
     ElMessage.error(err.response?.data?.message || '启动失败')
+  }
+}
+
+const handleViewEvaluation = async (taskId) => {
+  try {
+    const res = await getEvaluationByTaskId(taskId)
+    if (res.data && res.data.data) {
+      evaluation.value = res.data.data
+    } else {
+      evaluation.value = null
+    }
+    evaluationVisible.value = true
+  } catch (err) {
+    ElMessage.error('获取评估数据失败')
+    evaluation.value = null
   }
 }
 
@@ -225,3 +326,87 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.evaluation-content {
+  padding: 10px;
+}
+
+.evaluation-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.eval-card {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.eval-label {
+  font-size: 12px;
+  color: #86909C;
+  margin-bottom: 4px;
+}
+
+.eval-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #10B981;
+}
+
+.evaluation-info {
+  background: #0F172A;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #1E293B;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #86909C;
+  font-size: 13px;
+}
+
+.info-value {
+  color: #E5E6EB;
+  font-weight: 500;
+}
+
+.report-section {
+  background: #0F172A;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.report-section h3 {
+  color: #E5E6EB;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.report-pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12px;
+  color: #94A3B8;
+  background: #1E293B;
+  padding: 10px;
+  border-radius: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+</style>
