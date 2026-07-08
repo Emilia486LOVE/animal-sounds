@@ -196,7 +196,7 @@ onMounted(() => {
   gap: 30px;
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 1px solid #2A3344;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .result-info {
@@ -206,12 +206,12 @@ onMounted(() => {
 }
 
 .result-label {
-  color: #86909C;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .result-value {
-  color: #E5E6EB;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
 }
@@ -246,7 +246,7 @@ onMounted(() => {
 .top-name {
   font-size: 24px;
   font-weight: 700;
-  color: #E5E6EB;
+  color: var(--color-text-primary);
 }
 
 .top-confidence {
@@ -257,7 +257,7 @@ onMounted(() => {
 
 .top-hierarchy {
   font-size: 14px;
-  color: #86909C;
+  color: var(--color-text-secondary);
 }
 
 .hierarchy-label {
@@ -267,7 +267,7 @@ onMounted(() => {
 .prediction-list {
   h4 {
     margin-bottom: 12px;
-    color: #E5E6EB;
+    color: var(--color-text-primary);
     font-size: 14px;
     font-weight: 600;
   }
@@ -276,7 +276,7 @@ onMounted(() => {
 .info-content {
   p {
     margin-bottom: 8px;
-    color: #86909C;
+    color: var(--color-text-secondary);
     font-size: 14px;
     line-height: 1.6;
   }

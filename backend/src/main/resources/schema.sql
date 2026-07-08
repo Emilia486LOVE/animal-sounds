@@ -1,4 +1,4 @@
-CREATE DATABASE IF NOT EXISTS animal_voiceprint DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS animal_voice DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE animal_voiceprint;
 
@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS dataset (
     create_user_id INT,
     audio_count INT DEFAULT 0,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (create_user_id) REFERENCES sys_user(user_id),
     INDEX idx_create_user_id (create_user_id),
     INDEX idx_dataset_name (dataset_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -55,8 +54,6 @@ CREATE TABLE IF NOT EXISTS audio_file (
     upload_user_id INT,
     upload_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(255),
-    FOREIGN KEY (dataset_id) REFERENCES dataset(dataset_id),
-    FOREIGN KEY (upload_user_id) REFERENCES sys_user(user_id),
     INDEX idx_dataset_id (dataset_id),
     INDEX idx_noise_level (noise_level),
     INDEX idx_location (location),
@@ -78,10 +75,6 @@ CREATE TABLE IF NOT EXISTS annotation_record (
     review_remark VARCHAR(255),
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (audio_id) REFERENCES audio_file(audio_id),
-    FOREIGN KEY (annotator_id) REFERENCES sys_user(user_id),
-    FOREIGN KEY (label_id) REFERENCES taxonomy_label(label_id),
-    FOREIGN KEY (reviewer_id) REFERENCES sys_user(user_id),
     INDEX idx_audio_id (audio_id),
     INDEX idx_label_id (label_id),
     INDEX idx_status (status),
@@ -108,8 +101,6 @@ CREATE TABLE IF NOT EXISTS train_task (
     best_model_path VARCHAR(500),
     best_val_metric DECIMAL(5,4),
     checkpoint_path VARCHAR(500),
-    FOREIGN KEY (dataset_id) REFERENCES dataset(dataset_id),
-    FOREIGN KEY (create_user_id) REFERENCES sys_user(user_id),
     INDEX idx_dataset_id (dataset_id),
     INDEX idx_status (status),
     INDEX idx_create_user_id (create_user_id),
@@ -126,7 +117,6 @@ CREATE TABLE IF NOT EXISTS evaluation_result (
     f1_score DECIMAL(5,4),
     confusion_matrix_path VARCHAR(500),
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES train_task(task_id),
     INDEX idx_task_id (task_id),
     INDEX idx_taxon_rank (taxon_rank),
     UNIQUE KEY uk_task_rank (task_id, taxon_rank)
@@ -137,8 +127,6 @@ CREATE TABLE IF NOT EXISTS train_sample (
     task_id INT,
     annotation_id INT,
     split VARCHAR(10) DEFAULT 'train',
-    FOREIGN KEY (task_id) REFERENCES train_task(task_id),
-    FOREIGN KEY (annotation_id) REFERENCES annotation_record(annotation_id),
     INDEX idx_task_id (task_id),
     INDEX idx_annotation_id (annotation_id),
     INDEX idx_split (split),

@@ -125,13 +125,13 @@
       v-model="playModalVisible"
       width="800px"
     >
-      <div style="display: 'flex'; alignItems: 'center'; gap: 12; marginBottom: 16">
+      <div class="audio-nav">
         <el-button
           icon="ArrowLeft"
           @click="prevAudio"
           :disabled="audioFiles.length <= 1"
         />
-        <span class="number-font" style="color: '#86909C'">
+        <span class="number-font text-secondary">
           {{ currentAudioIndex + 1 }} / {{ audioFiles.length }}
         </span>
         <el-button
@@ -142,31 +142,31 @@
       </div>
 
       <div style="marginBottom: 16">
-        <div ref="waveformRef" id="waveform" style="backgroundColor: '#121826'; borderRadius: 8; height: 150" />
+        <div ref="waveformRef" id="waveform" class="waveform-panel" />
       </div>
 
-      <div v-if="wavesurfer" style="display: 'flex'; alignItems: 'center'; gap: 12">
+      <div v-if="wavesurfer" class="audio-nav">
         <el-button type="primary" icon="VideoPlay" @click="wavesurfer.playPause()">
           {{ wavesurfer.isPlaying() ? '暂停' : '播放' }}
         </el-button>
-        <span class="number-font" style="color: '#86909C'">
+        <span class="number-font text-secondary">
           {{ wavesurfer.getCurrentTime().toFixed(2) }} / {{ wavesurfer.getDuration().toFixed(2) }} s
         </span>
       </div>
 
-      <div v-if="selectedAudio" style="marginTop: 16; paddingTop: 16; borderTop: '1px solid #2A3344'">
-        <div style="display: 'grid'; gridTemplateColumns: 'repeat(3, 1fr)'; gap: 12">
+      <div v-if="selectedAudio" class="audio-detail">
+        <div class="audio-detail-grid">
           <div>
-            <span style="color: '#86909C'; fontSize: 12">采样率</span>
-            <div class="number-font" style="color: '#E5E6EB'; marginTop: 4">{{ selectedAudio.sampleRate }} Hz</div>
+            <span class="detail-label">采样率</span>
+            <div class="number-font detail-value">{{ selectedAudio.sampleRate }} Hz</div>
           </div>
           <div>
-            <span style="color: '#86909C'; fontSize: 12">时长</span>
-            <div class="number-font" style="color: '#E5E6EB'; marginTop: 4">{{ selectedAudio.duration?.toFixed(2) }} s</div>
+            <span class="detail-label">时长</span>
+            <div class="number-font detail-value">{{ selectedAudio.duration?.toFixed(2) }} s</div>
           </div>
           <div>
-            <span style="color: '#86909C'; fontSize: 12">噪声等级</span>
-            <div style="color: '#E5E6EB'; marginTop: 4">
+            <span class="detail-label">噪声等级</span>
+            <div class="detail-value">
               <el-tag :type="noiseLevelType(selectedAudio.noiseLevel)">
                 {{ noiseLevelLabel(selectedAudio.noiseLevel) }}
               </el-tag>
@@ -277,7 +277,7 @@ const initWaveSurfer = () => {
   nextTick(() => {
     wavesurfer = WaveSurfer.create({
       container: '#waveform',
-      waveColor: '#2A3344',
+      waveColor: '#C9CDD4',
       progressColor: '#165DFF',
       cursorColor: '#165DFF',
       barWidth: 2,
@@ -445,3 +445,40 @@ onMounted(() => {
   loadLabels()
 })
 </script>
+
+<style scoped>
+.audio-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.waveform-panel {
+  height: 150px;
+  border-radius: 8px;
+  background-color: var(--color-bg-active);
+}
+
+.audio-detail {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.audio-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.detail-label {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.detail-value {
+  color: var(--color-text-primary);
+  margin-top: 4px;
+}
+</style>

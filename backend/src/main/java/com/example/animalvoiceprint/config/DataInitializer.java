@@ -359,13 +359,13 @@ public class DataInitializer implements CommandLineRunner {
             AudioFile audio = new AudioFile();
             audio.setDatasetId(datasetId);
             audio.setFileName(animalNames[animalIndex] + "_" + String.format("%03d", i + 1) + ".wav");
-            
+
             String realFilePath = uploadDir + "/" + datasetId + "/" + animalNames[animalIndex] + "_001.wav";
             if (!new java.io.File(realFilePath).exists()) {
                 realFilePath = "/uploads/" + datasetId + "/" + audio.getFileName();
             }
             audio.setFilePath(realFilePath);
-            
+
             audio.setDuration(BigDecimal.valueOf(2.0).setScale(3, RoundingMode.HALF_UP));
             audio.setSampleRate(44100);
             audio.setChannels(1);

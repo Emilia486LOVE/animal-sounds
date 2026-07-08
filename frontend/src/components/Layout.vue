@@ -91,6 +91,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCurrentUser } from '../api/auth'
 import {
@@ -100,6 +101,8 @@ import {
 const loading = ref(true)
 const collapsed = ref(false)
 const user = ref({})
+const route = useRoute()
+const router = useRouter()
 
 const roleMenus = {
   admin: [
@@ -143,24 +146,25 @@ const menus = computed(() => {
 })
 
 const activeMenu = computed(() => {
-  return window.location.pathname
+  return route.path
 })
 
 const breadcrumbs = computed(() => {
-  const path = window.location.pathname
-  const menu = menus.value.find(m => m.key === path)
+  const menu = menus.value.find(m => m.key === route.path)
   return ['首页', menu ? menu.label : '']
 })
 
 const handleMenuClick = (key) => {
-  window.location.href = key
+  if (key !== route.path) {
+    router.push(key)
+  }
 }
 
 const handleLogout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   ElMessage.success('退出成功')
-  window.location.href = '/login'
+  router.replace('/login')
 }
 
 const handleCommand = (command) => {
@@ -187,14 +191,14 @@ onMounted(() => {
       .catch(() => {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        window.location.href = '/login'
+        router.replace('/login')
       })
       .finally(() => {
         loading.value = false
       })
   } else {
     loading.value = false
-    window.location.href = '/login'
+    router.replace('/login')
   }
 })
 </script>

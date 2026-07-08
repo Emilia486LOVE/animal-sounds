@@ -98,15 +98,15 @@
         </el-form-item>
         <el-form-item label="学习率" prop="learningRate">
           <el-input-number v-model="form.learningRate" :min="0.0001" :max="0.1" :step="0.001" placeholder="0.001" />
-          <span style="margin-left: 8px; color: #86909C; font-size: 12px">控制模型学习速度，过小收敛慢，过大不稳定</span>
+          <span class="form-tip">控制模型学习速度，过小收敛慢，过大不稳定</span>
         </el-form-item>
         <el-form-item label="批处理大小" prop="batchSize">
           <el-input-number v-model="form.batchSize" :min="1" :max="512" :step="8" placeholder="32" />
-          <span style="margin-left: 8px; color: #86909C; font-size: 12px">每次训练处理的样本数，越大训练越快但内存消耗越多</span>
+          <span class="form-tip">每次训练处理的样本数，越大训练越快但内存消耗越多</span>
         </el-form-item>
         <el-form-item label="训练轮数" prop="epochs">
           <el-input-number v-model="form.epochs" :min="1" :max="1000" :step="10" placeholder="50" />
-          <span style="margin-left: 8px; color: #86909C; font-size: 12px">模型训练的总轮数，越多可能效果越好但过拟合风险增加</span>
+          <span class="form-tip">模型训练的总轮数，越多可能效果越好但过拟合风险增加</span>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" native-type="submit" @click="handleSubmit">提交</el-button>
@@ -340,7 +340,8 @@ onUnmounted(() => {
 }
 
 .eval-card {
-  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  background: var(--color-bg-active);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 12px;
   text-align: center;
@@ -348,7 +349,7 @@ onUnmounted(() => {
 
 .eval-label {
   font-size: 12px;
-  color: #86909C;
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 
@@ -359,7 +360,8 @@ onUnmounted(() => {
 }
 
 .evaluation-info {
-  background: #0F172A;
+  background: var(--color-bg-active);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 20px;
@@ -369,7 +371,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid #1E293B;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .info-row:last-child {
@@ -377,23 +379,24 @@ onUnmounted(() => {
 }
 
 .info-label {
-  color: #86909C;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
 .info-value {
-  color: #E5E6EB;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .report-section {
-  background: #0F172A;
+  background: var(--color-bg-active);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 12px;
 }
 
 .report-section h3 {
-  color: #E5E6EB;
+  color: var(--color-text-primary);
   font-size: 14px;
   margin-bottom: 10px;
 }
@@ -402,11 +405,18 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-all;
   font-size: 12px;
-  color: #94A3B8;
-  background: #1E293B;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-module);
+  border: 1px solid var(--color-border);
   padding: 10px;
   border-radius: 4px;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.form-tip {
+  margin-left: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 </style>

@@ -110,8 +110,8 @@ const handleLogin = async () => {
   justify-content: center;
   background-color: var(--color-bg-global);
   background-image: 
-    linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px);
+    linear-gradient(rgba(201, 205, 212, 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 205, 212, 0.45) 1px, transparent 1px);
   background-size: 20px 20px;
   padding: 16px;
 }

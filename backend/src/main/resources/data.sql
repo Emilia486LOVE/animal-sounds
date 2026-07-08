@@ -1,8 +1,9 @@
 INSERT INTO sys_user (username, password_hash, real_name, role, status) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjzqAKL9xL5jvMFVdNJHvGCgTq/VEq', '系统管理员', 'admin', 1),
-('annotator1', '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjzqAKL9xL5jvMFVdNJHvGCgTq/VEq', '标注员张三', 'annotator', 1),
-('algorithm1', '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjzqAKL9xL5jvMFVdNJHvGCgTq/VEq', '算法工程师李四', 'algorithm', 1),
-('guest1', '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjzqAKL9xL5jvMFVdNJHvGCgTq/VEq', '访客王五', 'guest', 1);
+('admin', '$2a$10$M7SJyWs97TRuZhQb6DV0pOr4S/x5tkJXpvKk3M0rH.OdXuPmK0jgu', '系统管理员', 'admin', 1),
+('super', '$2a$10$b2GIfRCrDOJ9mN13.tR1EeSFLP7Z1qKMTaL2Cy8Nl98NeHzK7cYMu', 'Super Admin', 'admin', 1),
+('annotator1', '$2a$10$M7SJyWs97TRuZhQb6DV0pOr4S/x5tkJXpvKk3M0rH.OdXuPmK0jgu', '标注员张三', 'annotator', 1),
+('algorithm1', '$2a$10$M7SJyWs97TRuZhQb6DV0pOr4S/x5tkJXpvKk3M0rH.OdXuPmK0jgu', '算法工程师李四', 'algorithm', 1),
+('guest1', '$2a$10$M7SJyWs97TRuZhQb6DV0pOr4S/x5tkJXpvKk3M0rH.OdXuPmK0jgu', '访客王五', 'guest', 1);
 
 INSERT INTO taxonomy_label (label_name, parent_id, taxon_rank, description, label_path) VALUES
 ('动物界', 0, 'kingdom', '动物界', '0/1'),
