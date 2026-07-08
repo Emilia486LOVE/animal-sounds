@@ -97,10 +97,10 @@
             <el-table-column label="标注进度" width="150">
               <template #default="scope">
                 <div style="display:flex;flex-direction:column;gap:4px">
-                  <div style="height:6px;background-color:#2A3344;border-radius:3px;overflow:hidden">
+                  <div style="height:6px;background-color:#E5E6EB;border-radius:3px;overflow:hidden">
                     <div :style="{ height: '100%', width: `${(scope.row.audioCount || 0) > 0 ? (Math.floor((scope.row.audioCount || 0) * 0.65) / (scope.row.audioCount || 0)) * 100 : 0}%`, backgroundColor: '#165DFF', borderRadius: '3px' }"></div>
                   </div>
-                  <span class="number-font" style="font-size:11px;color:#86909C">{{ Math.floor((scope.row.audioCount || 0) * 0.65) }}/{{ scope.row.audioCount || 0 }}</span>
+                  <span class="number-font" style="font-size:11px;color:#4E5969">{{ Math.floor((scope.row.audioCount || 0) * 0.65) }}/{{ scope.row.audioCount || 0 }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -248,10 +248,10 @@ const initCharts = () => {
   if (annotationChartRef.value) {
     const annotationChart = echarts.init(annotationChartRef.value)
     annotationChart.setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { color: '#E5E6EB' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { color: '#1D2129' } },
       legend: { 
         data: ['已标注', '待标注', '已审核'], 
-        textStyle: { color: '#86909C', fontSize: 12 },
+        textStyle: { color: '#4E5969', fontSize: 12 },
         top: 5,
         left: 'center'
       },
@@ -259,20 +259,20 @@ const initCharts = () => {
       xAxis: {
         type: 'category',
         data: ['哺乳动物', '鸟类', '爬行动物', '两栖动物', '鱼类', '昆虫'],
-        axisLabel: { color: '#86909C', fontSize: 11 },
-        axisLine: { lineStyle: { color: '#2A3344' } },
+        axisLabel: { color: '#4E5969', fontSize: 11 },
+        axisLine: { lineStyle: { color: '#E5E6EB' } },
         axisTick: { show: false }
       },
       yAxis: { 
         type: 'value', 
-        axisLabel: { color: '#86909C', fontSize: 11 },
+        axisLabel: { color: '#4E5969', fontSize: 11 },
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: '#2A3344', type: 'dashed' } }
+        splitLine: { lineStyle: { color: '#E5E6EB', type: 'dashed' } }
       },
       series: [
         { name: '已标注', type: 'bar', data: [120, 85, 45, 30, 60, 95], itemStyle: { color: '#165DFF', borderRadius: [4, 4, 0, 0] } },
-        { name: '待标注', type: 'bar', data: [30, 25, 15, 10, 20, 35], itemStyle: { color: '#2A3344', borderRadius: [4, 4, 0, 0] } },
+        { name: '待标注', type: 'bar', data: [30, 25, 15, 10, 20, 35], itemStyle: { color: '#C9CDD4', borderRadius: [4, 4, 0, 0] } },
         { name: '已审核', type: 'bar', data: [95, 65, 30, 20, 45, 70], itemStyle: { color: '#00B42A', borderRadius: [4, 4, 0, 0] } },
       ],
     })
@@ -284,14 +284,14 @@ const initCharts = () => {
     trainingChart.setOption({
       tooltip: { 
         trigger: 'axis', 
-        textStyle: { color: '#E5E6EB' },
-        backgroundColor: 'rgba(26, 34, 51, 0.95)',
-        borderColor: '#2A3344',
+        textStyle: { color: '#1D2129' },
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderColor: '#E5E6EB',
         borderWidth: 1
       },
       legend: { 
         data: ['准确率', 'F1分数'], 
-        textStyle: { color: '#86909C', fontSize: 12 },
+        textStyle: { color: '#4E5969', fontSize: 12 },
         top: 5,
         left: 'center'
       },
@@ -300,17 +300,17 @@ const initCharts = () => {
         type: 'category',
         boundaryGap: false,
         data: ['第1轮', '第2轮', '第3轮', '第4轮', '第5轮', '第6轮', '第7轮', '第8轮'],
-        axisLabel: { color: '#86909C', fontSize: 11 },
-        axisLine: { lineStyle: { color: '#2A3344' } },
+        axisLabel: { color: '#4E5969', fontSize: 11 },
+        axisLine: { lineStyle: { color: '#E5E6EB' } },
         axisTick: { show: false }
       },
       yAxis: { 
         type: 'value', 
         max: 1, 
-        axisLabel: { color: '#86909C', fontSize: 11, formatter: '{value}' },
+        axisLabel: { color: '#4E5969', fontSize: 11, formatter: '{value}' },
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { lineStyle: { color: '#2A3344', type: 'dashed' } }
+        splitLine: { lineStyle: { color: '#E5E6EB', type: 'dashed' } }
       },
       series: [
         { 

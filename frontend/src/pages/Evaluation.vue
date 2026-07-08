@@ -179,8 +179,8 @@ const initCharts = () => {
     accuracyChart.setOption({
       tooltip: { trigger: 'axis' },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#86909C' } },
-      yAxis: { type: 'value', max: 1, axisLabel: { color: '#86909C' } },
+      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#4E5969' } },
+      yAxis: { type: 'value', max: 1, axisLabel: { color: '#4E5969' } },
       series: [
         { name: '准确率', type: 'bar', data: evaluations.value.map(e => e.accuracy), itemStyle: { color: '#165DFF' } }
       ]
@@ -194,8 +194,8 @@ const initCharts = () => {
     f1Chart.setOption({
       tooltip: { trigger: 'axis' },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#86909C' } },
-      yAxis: { type: 'value', max: 1, axisLabel: { color: '#86909C' } },
+      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#4E5969' } },
+      yAxis: { type: 'value', max: 1, axisLabel: { color: '#4E5969' } },
       series: [
         { name: 'F1分数', type: 'line', data: evaluations.value.map(e => e.f1Score), smooth: true, itemStyle: { color: '#165DFF' }, lineStyle: { width: 3 } }
       ]
@@ -208,10 +208,10 @@ const initCharts = () => {
     metricsChart = echarts.init(metricsChartRef.value)
     metricsChart.setOption({
       tooltip: { trigger: 'axis' },
-      legend: { data: ['准确率', '精确率', '召回率', 'F1分数'], textStyle: { color: '#86909C' } },
+      legend: { data: ['准确率', '精确率', '召回率', 'F1分数'], textStyle: { color: '#4E5969' } },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#86909C' } },
-      yAxis: { type: 'value', max: 1, axisLabel: { color: '#86909C' } },
+      xAxis: { type: 'category', data: xAxisData, axisLabel: { color: '#4E5969' } },
+      yAxis: { type: 'value', max: 1, axisLabel: { color: '#4E5969' } },
       series: [
         { name: '准确率', type: 'line', data: evaluations.value.map(e => e.accuracy), smooth: true, itemStyle: { color: '#165DFF' } },
         { name: '精确率', type: 'line', data: evaluations.value.map(e => e.precision), smooth: true, itemStyle: { color: '#00B42A' } },
