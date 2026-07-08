@@ -349,6 +349,13 @@ public class AnimalClassificationModel {
         Map<String, Double> labelDistances = new HashMap<>();
         Map<String, Double> labelMinDistances = new HashMap<>();
 
+        Set<String> allLabels = new HashSet<>();
+        Map<String, Integer> labelNameToId = new HashMap<>();
+        for (TrainingSample sample : trainingSamples) {
+            allLabels.add(sample.labelName());
+            labelNameToId.put(sample.labelName(), sample.labelId());
+        }
+
         for (int i = 0; i < effectiveK; i++) {
             Neighbor neighbor = neighbors.get(i);
             String label = neighbor.labelName();
@@ -369,22 +376,30 @@ public class AnimalClassificationModel {
         }
 
         List<Map<String, Object>> predictions = new ArrayList<>();
-        for (Map.Entry<String, Double> entry : labelWeights.entrySet()) {
-            String labelName = entry.getKey();
-            double totalWeight = entry.getValue();
-            int count = labelCounts.get(labelName);
-            double avgDistance = labelDistances.get(labelName) / count;
-            double minDistance = labelMinDistances.getOrDefault(labelName, avgDistance);
+        for (String labelName : allLabels) {
+            double totalWeight = labelWeights.getOrDefault(labelName, 0.0);
+            int count = labelCounts.getOrDefault(labelName, 0);
+            Double avgDistance = labelDistances.get(labelName);
+            
+            double minDistance = Double.MAX_VALUE;
+            for (Neighbor neighbor : neighbors) {
+                if (neighbor.labelName().equals(labelName) && neighbor.distance() < minDistance) {
+                    minDistance = neighbor.distance();
+                }
+            }
+            if (minDistance == Double.MAX_VALUE && !neighbors.isEmpty()) {
+                minDistance = neighbors.get(neighbors.size() - 1).distance() * 1.5;
+            }
+            
+            if (avgDistance == null) {
+                avgDistance = minDistance;
+            } else {
+                avgDistance = avgDistance / count;
+            }
             
             double confidence = calculateConfidence(count, avgDistance, minDistance, effectiveK);
             
-            Integer labelId = null;
-            for (TrainingSample sample : trainingSamples) {
-                if (sample.labelName().equals(labelName)) {
-                    labelId = sample.labelId();
-                    break;
-                }
-            }
+            Integer labelId = labelNameToId.get(labelName);
 
             Map<String, Object> pred = new HashMap<>();
             pred.put("labelName", labelName);
