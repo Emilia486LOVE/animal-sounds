@@ -145,6 +145,7 @@ public class TrainTaskService {
             String modelPath = "./models/knn_model_task_" + task.getTaskId() + "_" + System.currentTimeMillis() + ".dat";
             classificationModel.saveModelToPath(modelPath);
 
+            task.setCurrentEpoch(3);
             task.setStatus("success");
             task.setEndTime(LocalDateTime.now());
             task.setModelSavePath(modelPath);
@@ -158,6 +159,7 @@ public class TrainTaskService {
             task.setStatus("failed");
             task.setEndTime(LocalDateTime.now());
             task.setErrorMsg(e.getMessage());
+            task.setCurrentEpoch(0);
             taskRepository.save(task);
         }
     }

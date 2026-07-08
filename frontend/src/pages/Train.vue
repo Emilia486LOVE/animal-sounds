@@ -46,12 +46,10 @@
             >
           </template>
         </el-table-column>
-        <el-table-column prop="currentEpoch" label="当前轮次" width="100">
+        <el-table-column prop="currentEpoch" label="训练阶段" width="120">
           <template #default="scope">
             <span class="number-font">{{
-              scope.row.currentEpoch != null
-                ? `${scope.row.currentEpoch}轮`
-                : "-"
+              epochStageMap[scope.row.currentEpoch] || "-"
             }}</span>
           </template>
         </el-table-column>
@@ -282,6 +280,14 @@ const statusConfig = {
   running: { color: "warning", text: "训练中" },
   success: { color: "success", text: "已完成" },
   failed: { color: "danger", text: "失败" },
+};
+
+const epochStageMap = {
+  0: "等待中",
+  1: "特征提取",
+  2: "模型训练",
+  3: "模型评估",
+  4: "已完成",
 };
 
 const loadTasks = async () => {
