@@ -36,16 +36,8 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
-uploads/
-models/
-features/
-results/
-audio_files/
-cache/
-*.wav
-*.mp3
-*.ogg
-*.flac
-
 .mvn/
 maven-wrapper.jar
+
+screenshots/
+test-e2e/
