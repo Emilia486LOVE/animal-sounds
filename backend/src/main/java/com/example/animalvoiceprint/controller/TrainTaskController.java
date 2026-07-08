@@ -98,4 +98,13 @@ public class TrainTaskController {
         trainTaskService.deleteTask(taskId);
         return ResponseEntity.ok(ApiResponse.success("训练任务已删除", null));
     }
+    
+    @PutMapping("/tasks/{id}/model-path")
+    @PreAuthorize("hasAnyRole('admin', 'algorithm')")
+    public ResponseEntity<ApiResponse<TrainTask>> updateTaskModelPath(
+            @PathVariable("id") Integer taskId,
+            @RequestParam("modelPath") String modelPath) {
+        TrainTask task = trainTaskService.updateTaskModelPath(taskId, modelPath);
+        return ResponseEntity.ok(ApiResponse.success("模型路径已更新", task));
+    }
 }

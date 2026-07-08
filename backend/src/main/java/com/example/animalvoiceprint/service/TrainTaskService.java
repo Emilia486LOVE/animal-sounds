@@ -142,8 +142,8 @@ public class TrainTaskService {
             double accuracy = evaluation.containsKey("error") ? 0.0 
                 : (double) evaluation.getOrDefault("accuracy", 0.0);
 
-            String modelPath = "./models/knn_model_task_" + task.getTaskId() + "_" + System.currentTimeMillis() + ".dat";
-            classificationModel.saveModelToPath(modelPath);
+            classificationModel.saveModel();
+            String modelPath = "./models/animal_classification_model.dat";
 
             task.setCurrentEpoch(3);
             task.setStatus("success");
@@ -320,6 +320,12 @@ public class TrainTaskService {
         }
         
         taskRepository.deleteById(taskId);
+    }
+    
+    public TrainTask updateTaskModelPath(Integer taskId, String modelPath) {
+        TrainTask task = getTaskById(taskId);
+        task.setModelSavePath(modelPath);
+        return taskRepository.save(task);
     }
     
     public Map<String, Object> getTaskProgress(Integer taskId) {
