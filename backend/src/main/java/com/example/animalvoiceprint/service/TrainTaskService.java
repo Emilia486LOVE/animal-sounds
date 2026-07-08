@@ -223,9 +223,13 @@ public class TrainTaskService {
         List<AnnotationRecord> annotations = annotationRepository.findAll();
         List<Integer> annotationIds = new ArrayList<>();
         for (AnnotationRecord ann : annotations) {
-            if (ann.getAudioId() != null && "approved".equals(ann.getStatus())) {
+            if (ann.getAudioId() != null && ann.getLabelId() != null) {
                 annotationIds.add(ann.getAnnotationId());
             }
+        }
+        
+        if (annotationIds.isEmpty()) {
+            throw new BusinessException("没有可用的标注数据用于训练，请先创建标注");
         }
         
         Collections.shuffle(annotationIds);

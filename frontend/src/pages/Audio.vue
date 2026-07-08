@@ -561,7 +561,7 @@ const handleSubmit = async () => {
   }
 };
 
-const handleUpload = ({ file }) => {
+const handleUpload = async ({ file }) => {
   if (!selectedDataset.value) {
     ElMessage.error("请先选择数据集");
     return false;
@@ -571,14 +571,13 @@ const handleUpload = ({ file }) => {
   formData.append("files", file.raw);
   formData.append("datasetId", selectedDataset.value);
 
-  uploadAudioFiles(formData)
-    .then(() => {
-      ElMessage.success("上传成功");
-      loadAudioFiles();
-    })
-    .catch((err) => {
-      ElMessage.error(err.response?.data?.message || "上传失败");
-    });
+  try {
+    await uploadAudioFiles(formData);
+    ElMessage.success("上传成功");
+    loadAudioFiles();
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || "上传失败");
+  }
 
   return false;
 };
