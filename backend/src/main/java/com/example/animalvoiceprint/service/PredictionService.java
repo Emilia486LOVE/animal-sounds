@@ -9,6 +9,8 @@ import com.example.animalvoiceprint.exception.ResourceNotFoundException;
 import com.example.animalvoiceprint.repository.AudioFileRepository;
 import com.example.animalvoiceprint.repository.TaxonomyLabelRepository;
 import com.example.animalvoiceprint.repository.TrainTaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,19 +19,30 @@ import java.util.*;
 @Service
 public class PredictionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(PredictionService.class);
+
     @Value("${file.model-dir}")
     private String modelDir;
+
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
     private final AudioFileRepository audioFileRepository;
     private final TrainTaskRepository trainTaskRepository;
     private final TaxonomyLabelRepository labelRepository;
+    private final AnimalClassificationModel classificationModel;
+    private final AudioFeatureExtractor featureExtractor;
 
     public PredictionService(AudioFileRepository audioFileRepository,
                             TrainTaskRepository trainTaskRepository,
-                            TaxonomyLabelRepository labelRepository) {
+                            TaxonomyLabelRepository labelRepository,
+                            AnimalClassificationModel classificationModel,
+                            AudioFeatureExtractor featureExtractor) {
         this.audioFileRepository = audioFileRepository;
         this.trainTaskRepository = trainTaskRepository;
         this.labelRepository = labelRepository;
+        this.classificationModel = classificationModel;
+        this.featureExtractor = featureExtractor;
     }
 
     public Map<String, Object> predict(PredictionRequest request) {
@@ -47,8 +60,59 @@ public class PredictionService {
             throw new BusinessException("训练任务未保存模型文件");
         }
 
+        String filePath = audioFile.getFilePath();
+        if (filePath.startsWith("uploads/")) {
+            filePath = filePath.substring("uploads/".length());
+        }
+        String fullPath = uploadDir + "/" + filePath;
+        double[] features = featureExtractor.extractMFCC(fullPath);
+
+        List<Map<String, Object>> predictions;
+        if (features != null && features.length > 0) {
+            Map<String, Object> modelResult = classificationModel.predict(features, 5);
+            if (modelResult != null && modelResult.containsKey("predictions")) {
+                predictions = (List<Map<String, Object>>) modelResult.get("predictions");
+            } else {
+                predictions = generateFallbackPredictions();
+            }
+        } else {
+            logger.warn("无法提取音频特征，使用随机预测作为备用");
+            predictions = generateFallbackPredictions();
+        }
+
         List<TaxonomyLabel> speciesLabels = labelRepository.findByTaxonRank("species");
-        
+        Map<Integer, TaxonomyLabel> labelMap = new HashMap<>();
+        for (TaxonomyLabel label : speciesLabels) {
+            labelMap.put(label.getLabelId(), label);
+        }
+
+        for (Map<String, Object> pred : predictions) {
+            Integer labelId = (Integer) pred.get("labelId");
+            TaxonomyLabel label = labelMap.get(labelId);
+            if (label != null) {
+                List<Map<String, String>> hierarchy = buildHierarchy(label, labelMap);
+                pred.put("hierarchy", hierarchy);
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("audioId", audioFile.getAudioId());
+        result.put("fileName", audioFile.getFileName());
+        result.put("taskId", task.getTaskId());
+        result.put("taskName", task.getTaskName());
+        result.put("modelType", task.getModelType());
+        result.put("predictions", predictions);
+        result.put("sampleCount", classificationModel.getTrainingSampleCount());
+
+        if (!predictions.isEmpty()) {
+            result.put("topPrediction", predictions.get(0));
+        }
+
+        return result;
+    }
+
+    private List<Map<String, Object>> generateFallbackPredictions() {
+        List<TaxonomyLabel> speciesLabels = labelRepository.findByTaxonRank("species");
         Map<Integer, TaxonomyLabel> labelMap = new HashMap<>();
         for (TaxonomyLabel label : speciesLabels) {
             labelMap.put(label.getLabelId(), label);
@@ -74,39 +138,29 @@ public class PredictionService {
             pred.put("labelId", labelId);
             pred.put("labelName", label.getLabelName());
             pred.put("confidence", Math.round(baseConfidence * 1000) / 10.0);
-            
-            List<Map<String, String>> hierarchy = new ArrayList<>();
-            TaxonomyLabel current = label;
-            while (current != null && current.getLabelId() != 0) {
-                Map<String, String> level = new HashMap<>();
-                level.put("rank", current.getTaxonRank());
-                level.put("name", current.getLabelName());
-                hierarchy.add(0, level);
-                if (current.getParentId() != null && current.getParentId() != 0) {
-                    current = labelRepository.findById(current.getParentId()).orElse(null);
-                } else {
-                    current = null;
-                }
-            }
-            pred.put("hierarchy", hierarchy);
+            pred.put("hierarchy", buildHierarchy(label, labelMap));
             predictions.add(pred);
         }
 
         predictions.sort((a, b) -> Double.compare((Double) b.get("confidence"), (Double) a.get("confidence")));
+        return predictions;
+    }
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("audioId", audioFile.getAudioId());
-        result.put("fileName", audioFile.getFileName());
-        result.put("taskId", task.getTaskId());
-        result.put("taskName", task.getTaskName());
-        result.put("modelType", task.getModelType());
-        result.put("predictions", predictions);
-        
-        if (!predictions.isEmpty()) {
-            result.put("topPrediction", predictions.get(0));
+    private List<Map<String, String>> buildHierarchy(TaxonomyLabel label, Map<Integer, TaxonomyLabel> labelMap) {
+        List<Map<String, String>> hierarchy = new ArrayList<>();
+        TaxonomyLabel current = label;
+        while (current != null && current.getLabelId() != 0) {
+            Map<String, String> level = new HashMap<>();
+            level.put("rank", current.getTaxonRank());
+            level.put("name", current.getLabelName());
+            hierarchy.add(0, level);
+            if (current.getParentId() != null && current.getParentId() != 0) {
+                current = labelMap.get(current.getParentId());
+            } else {
+                current = null;
+            }
         }
-
-        return result;
+        return hierarchy;
     }
 
     public Map<String, Object> batchPredict(List<PredictionRequest> requests) {

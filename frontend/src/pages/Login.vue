@@ -1,14 +1,14 @@
 <template>
   <div class="login-container">
-    <el-card class="login-card">
+    <el-card class="login-card" role="form" aria-labelledby="login-title">
       <template #header>
         <div class="login-header">
-          <div class="login-icon">
+          <div class="login-icon" role="img" aria-label="动物声纹系统图标">
             <el-icon :size="32" class="login-icon-inner">
               <Mic />
             </el-icon>
           </div>
-          <h1 class="login-title">动物声纹系统</h1>
+          <h1 class="login-title" id="login-title">动物声纹系统</h1>
           <p class="login-subtitle">数据标注与多级分类训练平台</p>
         </div>
       </template>
@@ -19,6 +19,8 @@
             v-model="form.username"
             placeholder="请输入用户名"
             size="large"
+            aria-label="用户名"
+            @keyup.enter="handleLogin"
           >
             <template #prefix>
               <el-icon><User /></el-icon>
@@ -32,6 +34,8 @@
             type="password"
             placeholder="请输入密码"
             size="large"
+            aria-label="密码"
+            @keyup.enter="handleLogin"
           >
             <template #prefix>
               <el-icon><Lock /></el-icon>
@@ -46,6 +50,7 @@
             size="large"
             class="login-btn"
             @click="handleLogin"
+            aria-label="登录按钮"
           >
             登录
           </el-button>
@@ -64,41 +69,41 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
-import { login } from '../api/auth'
-import { Mic, User, Lock } from '@element-plus/icons-vue'
+import { ref, reactive } from "vue";
+import { ElMessage } from "element-plus";
+import { login } from "../api/auth";
+import { Mic, User, Lock } from "@element-plus/icons-vue";
 
-const loading = ref(false)
-const formRef = ref(null)
+const loading = ref(false);
+const formRef = ref(null);
 const form = reactive({
-  username: '',
-  password: ''
-})
+  username: "",
+  password: "",
+});
 
 const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
+  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+  password: [{ required: true, message: "请输入密码", trigger: "blur" }],
+};
 
 const handleLogin = async () => {
-  const valid = await formRef.value.validate()
-  if (!valid) return
-  
-  loading.value = true
+  const valid = await formRef.value.validate();
+  if (!valid) return;
+
+  loading.value = true;
   try {
-    const res = await login(form)
-    const { token, user } = res.data.data
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify(user))
-    ElMessage.success('登录成功')
-    window.location.href = '/dashboard'
+    const res = await login(form);
+    const { token, ...userInfo } = res.data.data;
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(userInfo));
+    ElMessage.success("登录成功");
+    window.location.href = "/dashboard";
   } catch (err) {
-    ElMessage.error(err.response?.data?.message || '登录失败')
+    ElMessage.error(err.response?.data?.message || "登录失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
@@ -109,9 +114,9 @@ const handleLogin = async () => {
   align-items: center;
   justify-content: center;
   background-color: var(--color-bg-global);
-  background-image: 
-    linear-gradient(rgba(201, 205, 212, 0.45) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(201, 205, 212, 0.45) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(42, 51, 68, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 51, 68, 0.3) 1px, transparent 1px);
   background-size: 20px 20px;
   padding: 16px;
 }
@@ -192,13 +197,13 @@ const handleLogin = async () => {
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-card);
   }
-  
+
   .login-icon {
     width: 56px;
     height: 56px;
     margin-bottom: 12px;
   }
-  
+
   .login-title {
     font-size: 20px;
   }

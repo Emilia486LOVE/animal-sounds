@@ -159,6 +159,63 @@ public class AudioFileService {
             datasetService.refreshAudioCount(audioFile.getDatasetId());
         }
     }
+
+    public AudioFile moveAudioToDataset(Integer audioId, Integer targetDatasetId) {
+        AudioFile audioFile = getAudioFileById(audioId);
+        Integer oldDatasetId = audioFile.getDatasetId();
+
+        datasetRepository.findById(targetDatasetId)
+                .orElseThrow(() -> new ResourceNotFoundException("目标数据集不存在: " + targetDatasetId));
+
+        audioFile.setDatasetId(targetDatasetId);
+        AudioFile saved = audioFileRepository.save(audioFile);
+
+        if (oldDatasetId != null) {
+            datasetService.refreshAudioCount(oldDatasetId);
+        }
+        datasetService.refreshAudioCount(targetDatasetId);
+
+        return saved;
+    }
+
+    public void batchMoveToDataset(List<Integer> audioIds, Integer targetDatasetId) {
+        datasetRepository.findById(targetDatasetId)
+                .orElseThrow(() -> new ResourceNotFoundException("目标数据集不存在: " + targetDatasetId));
+
+        java.util.Set<Integer> affectedDatasets = new java.util.HashSet<>();
+        for (Integer audioId : audioIds) {
+            AudioFile audioFile = getAudioFileById(audioId);
+            if (audioFile.getDatasetId() != null) {
+                affectedDatasets.add(audioFile.getDatasetId());
+            }
+            audioFile.setDatasetId(targetDatasetId);
+            audioFileRepository.save(audioFile);
+        }
+        affectedDatasets.add(targetDatasetId);
+        for (Integer dsId : affectedDatasets) {
+            datasetService.refreshAudioCount(dsId);
+        }
+    }
+
+    public void batchDelete(List<Integer> audioIds) {
+        java.util.Set<Integer> affectedDatasets = new java.util.HashSet<>();
+        for (Integer audioId : audioIds) {
+            AudioFile audioFile = audioFileRepository.findById(audioId).orElse(null);
+            if (audioFile != null) {
+                if (audioFile.getDatasetId() != null) {
+                    affectedDatasets.add(audioFile.getDatasetId());
+                }
+                try {
+                    Files.deleteIfExists(Paths.get(audioFile.getFilePath()));
+                } catch (IOException e) {
+                }
+                audioFileRepository.deleteById(audioId);
+            }
+        }
+        for (Integer dsId : affectedDatasets) {
+            datasetService.refreshAudioCount(dsId);
+        }
+    }
     
     
     
@@ -182,23 +239,28 @@ public class AudioFileService {
     
     public Resource loadAudioFileByDatasetAndName(Integer datasetId, String fileName) {
         try {
-            Path path = Paths.get(uploadDir, String.valueOf(datasetId), fileName).normalize().toAbsolutePath();
-            System.out.println("尝试加载音频文件: " + path.toString());
+            if (fileName == null || fileName.contains("..") || fileName.contains(File.separator) || fileName.contains("/")) {
+                return null;
+            }
+            Path basePath = Paths.get(uploadDir, String.valueOf(datasetId)).toAbsolutePath().normalize();
+            Path path = basePath.resolve(fileName).normalize().toAbsolutePath();
+            if (!path.startsWith(basePath)) {
+                return null;
+            }
             
             if (!Files.exists(path)) {
                 String baseName = fileName.substring(0, fileName.lastIndexOf('_')) + "_001.wav";
-                path = Paths.get(uploadDir, String.valueOf(datasetId), baseName).normalize().toAbsolutePath();
-                System.out.println("尝试备选路径: " + path.toString());
+                path = basePath.resolve(baseName).normalize().toAbsolutePath();
+                if (!path.startsWith(basePath)) {
+                    return null;
+                }
             }
             
             if (Files.exists(path)) {
-                System.out.println("文件存在，大小: " + Files.size(path) + " bytes");
                 Resource resource = new UrlResource(path.toUri());
                 if (resource.exists() && resource.isReadable()) {
                     return resource;
                 }
-            } else {
-                System.out.println("文件不存在");
             }
             
             return null;

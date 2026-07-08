@@ -20,7 +20,10 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
-    if (response.data && response.data.code === 401) {
+    if (
+      response.data &&
+      (response.data.code === 401 || response.data.code === 403)
+    ) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
@@ -28,7 +31,10 @@ request.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";

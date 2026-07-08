@@ -391,7 +391,6 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         List<AnnotationRecord> annotations = new ArrayList<>();
-        String[] soundTypes = {"bark", "meow", "chirp", "howl", "moo", "bleat", "roar", "purr", "squawk", "buzz", "trill"};
         String[] remarks = {
             "清晰的叫声",
             "带有背景噪声",
@@ -413,11 +412,40 @@ public class DataInitializer implements CommandLineRunner {
 
         List<AudioFile> audioFiles = audioFileRepository.findAll();
 
-        int[] speciesLabelIds = {12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
+        java.util.Map<String, int[]> animalLabelMap = new java.util.HashMap<>();
+        animalLabelMap.put("dog", new int[]{13});
+        animalLabelMap.put("cat", new int[]{15});
+        animalLabelMap.put("monkey", new int[]{16});
+        animalLabelMap.put("bee", new int[]{22});
+        animalLabelMap.put("sparrow", new int[]{20});
+        animalLabelMap.put("eagle", new int[]{21});
+        animalLabelMap.put("cow", new int[]{17});
+        animalLabelMap.put("goat", new int[]{18});
+        animalLabelMap.put("sheep", new int[]{19});
+        animalLabelMap.put("wolf", new int[]{12});
+        animalLabelMap.put("tiger", new int[]{14});
+
+        java.util.Map<String, String> animalSoundMap = new java.util.HashMap<>();
+        animalSoundMap.put("dog", "call");
+        animalSoundMap.put("cat", "call");
+        animalSoundMap.put("monkey", "call");
+        animalSoundMap.put("bee", "insect");
+        animalSoundMap.put("sparrow", "birdcall");
+        animalSoundMap.put("eagle", "birdcall");
+        animalSoundMap.put("cow", "call");
+        animalSoundMap.put("goat", "call");
+        animalSoundMap.put("sheep", "call");
+        animalSoundMap.put("wolf", "roar");
+        animalSoundMap.put("tiger", "roar");
 
         for (int i = 0; i < 150; i++) {
             AudioFile audio = audioFiles.get(i % audioFiles.size());
-            int labelId = speciesLabelIds[i % speciesLabelIds.length];
+            String fileName = audio.getFileName();
+            
+            String animalKey = fileName.substring(0, fileName.indexOf("_")).toLowerCase();
+            int[] labelIds = animalLabelMap.getOrDefault(animalKey, new int[]{13});
+            String soundType = animalSoundMap.getOrDefault(animalKey, "other");
+            
             int annotatorId = ((i % 5) + 2);
             Integer reviewerId = i % 3 == 0 ? 1 : null;
             int statusIndex = i % 3;
@@ -427,8 +455,8 @@ public class DataInitializer implements CommandLineRunner {
             annotation.setAnnotatorId(annotatorId);
             annotation.setStartTime(BigDecimal.ZERO);
             annotation.setEndTime(audio.getDuration());
-            annotation.setLabelId(labelId);
-            annotation.setSoundType(soundTypes[i % soundTypes.length]);
+            annotation.setLabelId(labelIds[0]);
+            annotation.setSoundType(soundType);
             annotation.setConfidence(70 + random.nextInt(31));
             annotation.setRemark(remarks[i % remarks.length]);
             annotation.setStatus(statuses[statusIndex]);
@@ -446,48 +474,22 @@ public class DataInitializer implements CommandLineRunner {
 
     private void ensureTrainTasks() {
         long existing = trainTaskRepository.count();
-        if (existing >= 5) {
-            System.out.println("训练任务已足够(" + existing + "条)，跳过");
+        if (existing > 0) {
+            System.out.println("训练任务已存在(" + existing + "条)，跳过");
             return;
         }
 
-        List<TrainTask> tasks = new ArrayList<>();
-
-        String[][] taskConfigs = {
-            {"CNN动物声纹分类模型", "1", "CNN", "{\"learningRate\":0.001,\"epochs\":50,\"batchSize\":32,\"trainValSplit\":0.8}"},
-            {"RNN时序声音识别模型", "1", "RNN", "{\"learningRate\":0.0005,\"epochs\":80,\"batchSize\":16,\"trainValSplit\":0.75}"},
-            {"Transformer注意力声音模型", "2", "Transformer", "{\"learningRate\":0.0001,\"epochs\":100,\"batchSize\":8,\"trainValSplit\":0.8}"},
-            {"CNN-LSTM混合模型", "3", "CNN-LSTM", "{\"learningRate\":0.001,\"epochs\":60,\"batchSize\":24,\"trainValSplit\":0.7}"},
-            {"ResNet深度声音分类", "4", "ResNet", "{\"learningRate\":0.0005,\"epochs\":120,\"batchSize\":16,\"trainValSplit\":0.85}"}
-        };
-
-        for (int i = 0; i < taskConfigs.length; i++) {
-            TrainTask task = new TrainTask();
-            task.setTaskName(taskConfigs[i][0]);
-            task.setDatasetId(Integer.parseInt(taskConfigs[i][1]));
-            task.setModelType(taskConfigs[i][2]);
-            task.setTrainParams(taskConfigs[i][3]);
-            task.setEnableHierarchicalLoss(1);
-            task.setStatus("success");
-            task.setCreateUserId(1);
-            task.setModelSavePath("/models/task_" + (i + 1) + "/model.h5");
-            task.setBestModelPath("/models/task_" + (i + 1) + "/best_model.h5");
-            task.setCheckpointPath("/models/task_" + (i + 1) + "/checkpoint/");
-            task.setCreateTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 09:00:00", dtf));
-            task.setStartTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 09:30:00", dtf));
-            task.setEndTime(LocalDateTime.parse("2024-05-" + String.format("%02d", (i + 1)) + " 12:00:00", dtf));
-            task.setCurrentEpoch(50 + i * 10);
-            task.setBestValMetric(BigDecimal.valueOf(0.85 + i * 0.02).setScale(4, RoundingMode.HALF_UP));
-
-            tasks.add(task);
-        }
-
-        trainTaskRepository.saveAll(tasks);
-        System.out.println("创建了 " + tasks.size() + " 个训练任务");
+        System.out.println("训练任务为空，等待用户通过系统创建真实任务");
     }
 
     private void ensureEvaluations() {
         List<TrainTask> tasks = trainTaskRepository.findAll();
+        
+        if (tasks.isEmpty()) {
+            System.out.println("没有训练任务，跳过评估数据初始化");
+            return;
+        }
+
         int neededCount = tasks.size();
         long existing = modelEvaluationRepository.count();
         
@@ -499,34 +501,25 @@ public class DataInitializer implements CommandLineRunner {
         List<ModelEvaluation> evaluations = new ArrayList<>();
         List<EvaluationResult> evalResults = new ArrayList<>();
 
-        double[][] evalMetrics = {
-            {0.85, 0.84, 0.86, 0.85, 0.82, 0.88},
-            {0.82, 0.81, 0.83, 0.82, 0.79, 0.85},
-            {0.91, 0.90, 0.92, 0.91, 0.88, 0.94},
-            {0.88, 0.87, 0.89, 0.88, 0.85, 0.91},
-            {0.93, 0.92, 0.94, 0.93, 0.90, 0.96}
-        };
-
         String[] taxonRanks = {"family", "species"};
 
         for (int i = 0; i < tasks.size(); i++) {
             TrainTask task = tasks.get(i);
-            double[] metrics = evalMetrics[i % evalMetrics.length];
-
+            
             ModelEvaluation eval = new ModelEvaluation();
             eval.setTaskId(task.getTaskId());
             eval.setModelType(task.getModelType());
-            eval.setAccuracy(BigDecimal.valueOf(metrics[0]).setScale(4, RoundingMode.HALF_UP));
-            eval.setPrecision(BigDecimal.valueOf(metrics[1]).setScale(4, RoundingMode.HALF_UP));
-            eval.setRecall(BigDecimal.valueOf(metrics[2]).setScale(4, RoundingMode.HALF_UP));
-            eval.setF1Score(BigDecimal.valueOf(metrics[3]).setScale(4, RoundingMode.HALF_UP));
-            eval.setMacroF1(BigDecimal.valueOf(metrics[4]).setScale(4, RoundingMode.HALF_UP));
-            eval.setMicroF1(BigDecimal.valueOf(metrics[5]).setScale(4, RoundingMode.HALF_UP));
+            eval.setAccuracy(BigDecimal.valueOf(0.85).setScale(4, RoundingMode.HALF_UP));
+            eval.setPrecision(BigDecimal.valueOf(0.84).setScale(4, RoundingMode.HALF_UP));
+            eval.setRecall(BigDecimal.valueOf(0.86).setScale(4, RoundingMode.HALF_UP));
+            eval.setF1Score(BigDecimal.valueOf(0.85).setScale(4, RoundingMode.HALF_UP));
+            eval.setMacroF1(BigDecimal.valueOf(0.82).setScale(4, RoundingMode.HALF_UP));
+            eval.setMicroF1(BigDecimal.valueOf(0.88).setScale(4, RoundingMode.HALF_UP));
             eval.setConfusionMatrix(generateConfusionMatrix(9));
             eval.setClassificationReport(generateClassificationReport());
             eval.setSampleCount(80);
             eval.setClassCount(9);
-            eval.setCreateTime(task.getEndTime().plusMinutes(5));
+            eval.setCreateTime(task.getEndTime() != null ? task.getEndTime().plusMinutes(5) : LocalDateTime.now());
 
             evaluations.add(eval);
 
@@ -534,13 +527,14 @@ public class DataInitializer implements CommandLineRunner {
                 EvaluationResult result = new EvaluationResult();
                 result.setTaskId(task.getTaskId());
                 result.setTaxonRank(rank);
+                double baseAccuracy = 0.85;
                 double rankFactor = rank.equals("family") ? 1.05 : 0.95;
-                result.setAccuracy(BigDecimal.valueOf(metrics[0] * rankFactor).setScale(4, RoundingMode.HALF_UP));
-                result.setPrecisionValue(BigDecimal.valueOf(metrics[1] * rankFactor).setScale(4, RoundingMode.HALF_UP));
-                result.setRecall(BigDecimal.valueOf(metrics[2] * rankFactor).setScale(4, RoundingMode.HALF_UP));
-                result.setF1Score(BigDecimal.valueOf(metrics[3] * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setAccuracy(BigDecimal.valueOf(baseAccuracy * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setPrecisionValue(BigDecimal.valueOf(0.84 * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setRecall(BigDecimal.valueOf(0.86 * rankFactor).setScale(4, RoundingMode.HALF_UP));
+                result.setF1Score(BigDecimal.valueOf(0.85 * rankFactor).setScale(4, RoundingMode.HALF_UP));
                 result.setConfusionMatrixPath("/results/task_" + (i + 1) + "/confusion_matrix_" + rank + ".png");
-                result.setCreateTime(task.getEndTime().plusMinutes(5));
+                result.setCreateTime(task.getEndTime() != null ? task.getEndTime().plusMinutes(5) : LocalDateTime.now());
 
                 evalResults.add(result);
             }
